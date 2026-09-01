@@ -16,7 +16,11 @@
  * GitHub Pages 같은 정적 호스팅에서는 fetch 가 차단된다. 수집은 여기서, 페이지는 JSON만 읽는다.
  */
 import { writeFile, mkdir } from "node:fs/promises";
+import { get as httpsGet } from "node:https";
+import { setDefaultResultOrder } from "node:dns";
 import { XMLParser } from "./tiny-xml.mjs";
+
+setDefaultResultOrder("ipv4first");
 
 let KEY = (process.env.DATA_GO_KR_KEY || "").trim();
 if (!KEY) {
@@ -68,18 +72,61 @@ function monthList(n) {
 /** 인증되지 않은 서비스인지 판별 (활용신청 안 한 API) */
 const NOT_REGISTERED = /SERVICE_KEY_IS_NOT_REGISTERED|등록되지\s*않은|NOT_REGISTERED_ERROR|SERVICE ACCESS DENIED/i;
 
+function requestText(url) {
+  return new Promise((resolve, reject) => {
+    const req = httpsGet(url, {
+      family: 4,
+      signal: AbortSignal.timeout(60_000),
+      headers: {
+        accept: "application/xml",
+        "user-agent": "giheung-dashboard/1.0",
+      },
+    }, res => {
+      let body = "";
+      res.setEncoding("utf8");
+      res.on("data", chunk => {
+        body += chunk;
+      });
+      res.on("end", () => resolve({
+        ok: (res.statusCode || 0) >= 200 &&
+            (res.statusCode || 0) < 300,
+        status: res.statusCode || 0,
+        text: body,
+      }));
+    });
+
+    req.on("error", reject);
+  });
+}
+
 async function call(src, ym) {
   const qs = new URLSearchParams({
-    serviceKey: KEY, LAWD_CD, DEAL_YMD: ym, pageNo: "1", numOfRows: "1000",
+    serviceKey: KEY,
+    LAWD_CD,
+    DEAL_YMD: ym,
+    pageNo: "1",
+    numOfRows: "1000",
   });
-  const res = await fetch(`${src.url}?${qs}`, { headers: { accept: "application/xml" } });
-  const text = await res.text();
-  if (NOT_REGISTERED.test(text)) { const e = new Error("not_registered"); e.notRegistered = true; throw e; }
-  if (!res.ok || /SERVICE ERROR|LIMITED_NUMBER|OpenAPI_ServiceResponse/.test(text)) {
-    const code = (text.match(/<returnReasonCode>(.*?)<\/returnReasonCode>/) || [])[1];
-    const msg  = (text.match(/<(?:returnAuthMsg|errMsg|resultMsg)>(.*?)<\//) || [])[1];
+
+  const res = await requestText(`${src.url}?${qs}`);
+  const text = res.text;
+
+  if (NOT_REGISTERED.test(text)) {
+    const e = new Error("not_registered");
+    e.notRegistered = true;
+    throw e;
+  }
+
+  if (!res.ok ||
+      /SERVICE ERROR|LIMITED_NUMBER|OpenAPI_ServiceResponse/.test(text)) {
+    const code =
+      (text.match(/<returnReasonCode>(.*?)<\/returnReasonCode>/) || [])[1];
+    const msg =
+      (text.match(/<(?:returnAuthMsg|errMsg|resultMsg)>(.*?)<\//) || [])[1];
+
     throw new Error(`${code || res.status} ${msg || ""}`.trim());
   }
+
   return XMLParser(text);
 }
 
