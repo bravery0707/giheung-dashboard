@@ -1,0 +1,1762 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>힐스테이트 기흥 리포트</title>
+<meta name="description" content="힐스테이트 기흥(구갈동 660) 실거래·시세·매물·규제·입지 통합 대시보드">
+<meta name="theme-color" content="#EDF2F7">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Gothic+A1:wght@500;700;800&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600&display=swap">
+<style>
+/* ─────────── tokens ─────────── */
+:root{
+  --bg:#E9EFF5; --surface:#FFFFFF; --surface-2:#F4F8FC; --surface-3:#E4EDF5;
+  --line:#D9E4EE; --line-2:#BECEDD;
+  --ink:#091A2B; --ink-2:#3F566D; --muted:#71889E;
+  --accent:#0F5FA8; --accent-ink:#FFFFFF; --accent-soft:#DDECFA; --glow:#14B8D4;
+  --s1:#00789E; --s2:#B06A00; --s3:#7A45B5;
+  --s1-soft:rgba(0,120,158,.12); --s2-soft:rgba(176,106,0,.12); --s3-soft:rgba(122,69,181,.12);
+  --good:#1B6B4C; --good-soft:#DCF0E6;
+  --warn:#8A5A06; --warn-soft:#FBEBCF;
+  --crit:#A63528; --crit-soft:#FAE1DD;
+  --sh-1:0 1px 2px rgba(9,26,43,.05);
+  --sh-2:0 1px 2px rgba(9,26,43,.05), 0 10px 30px -18px rgba(9,26,43,.30);
+  --r:14px; --r-sm:9px; --r-xs:6px;
+  --sans:"IBM Plex Sans KR", system-ui, -apple-system, "Apple SD Gothic Neo", sans-serif;
+  --disp:"Gothic A1", var(--sans);
+  --mono:"IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --hdr:58px;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#070E16; --surface:#101A25; --surface-2:#16222F; --surface-3:#1E2C3B;
+    --line:#23323F; --line-2:#35485A;
+    --ink:#E9F1F7; --ink-2:#A7BACA; --muted:#7C93A6;
+    --accent:#4FA8F0; --accent-ink:#04121F; --accent-soft:#122B41; --glow:#3FD8F0;
+    --s1:#2C9EB8; --s2:#C08A1F; --s3:#9270C9;
+    --s1-soft:rgba(44,158,184,.17); --s2-soft:rgba(192,138,31,.17); --s3-soft:rgba(146,112,201,.17);
+    --good:#5CBE90; --good-soft:#0F2A20;
+    --warn:#D6A63C; --warn-soft:#2A2312;
+    --crit:#E07C6C; --crit-soft:#2D1714;
+    --sh-1:0 1px 2px rgba(0,0,0,.45);
+    --sh-2:0 1px 2px rgba(0,0,0,.45), 0 10px 30px -18px rgba(0,0,0,.9);
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#070E16; --surface:#101A25; --surface-2:#16222F; --surface-3:#1E2C3B;
+  --line:#23323F; --line-2:#35485A;
+  --ink:#E9F1F7; --ink-2:#A7BACA; --muted:#7C93A6;
+  --accent:#4FA8F0; --accent-ink:#04121F; --accent-soft:#122B41; --glow:#3FD8F0;
+  --s1:#2C9EB8; --s2:#C08A1F; --s3:#9270C9;
+  --s1-soft:rgba(44,158,184,.17); --s2-soft:rgba(192,138,31,.17); --s3-soft:rgba(146,112,201,.17);
+  --good:#5CBE90; --good-soft:#0F2A20;
+  --warn:#D6A63C; --warn-soft:#2A2312;
+  --crit:#E07C6C; --crit-soft:#2D1714;
+  --sh-1:0 1px 2px rgba(0,0,0,.45);
+  --sh-2:0 1px 2px rgba(0,0,0,.45), 0 10px 30px -18px rgba(0,0,0,.9);
+}
+
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html{-webkit-text-size-adjust:100%; scroll-behavior:smooth}
+body{
+  margin:0; background:var(--bg); color:var(--ink);
+  font-family:var(--sans); font-size:15px; line-height:1.62;
+}
+h1,h2,h3,h4{font-family:var(--disp); font-weight:800; margin:0; letter-spacing:-.025em; text-wrap:balance; line-height:1.25}
+a{color:var(--accent); text-underline-offset:2px}
+button,input,select,textarea{font:inherit; color:inherit}
+:focus-visible{outline:2px solid var(--glow); outline-offset:2px; border-radius:5px}
+@media (prefers-reduced-motion:reduce){*{animation:none!important; transition:none!important; scroll-behavior:auto}}
+.num{font-family:var(--mono); font-variant-numeric:tabular-nums}
+.sr{position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap}
+
+.wrap{max-width:1160px; margin:0 auto; padding:0 22px}
+@media(max-width:700px){.wrap{padding:0 14px}}
+
+/* ─────────── header ─────────── */
+.hdr{
+  position:sticky; top:0; z-index:50; height:var(--hdr);
+  background:color-mix(in srgb, var(--surface) 88%, transparent);
+  backdrop-filter:saturate(1.5) blur(12px); -webkit-backdrop-filter:saturate(1.5) blur(12px);
+  border-bottom:1px solid var(--line);
+}
+.hdr-in{height:var(--hdr); display:flex; align-items:center; gap:12px}
+.mark{display:flex; align-items:center; gap:9px; min-width:0; margin-right:auto}
+.mark .glyph{
+  width:28px; height:28px; border-radius:8px; flex:none; display:grid; place-items:center;
+  background:linear-gradient(145deg, var(--accent), var(--glow)); color:#fff;
+  font-family:var(--mono); font-size:12px; font-weight:600; letter-spacing:-.05em;
+}
+.mark b{font-family:var(--disp); font-weight:800; font-size:16px; letter-spacing:-.03em; white-space:nowrap}
+.mark span{font-size:11px; color:var(--muted); white-space:nowrap}
+@media(max-width:560px){.mark span{display:none}}
+.ghost{
+  height:32px; padding:0 11px; display:inline-flex; align-items:center; gap:6px;
+  border:1px solid var(--line); background:var(--surface-2); border-radius:var(--r-sm);
+  font-size:12px; font-weight:500; color:var(--ink-2); cursor:pointer; white-space:nowrap;
+}
+.ghost:hover{border-color:var(--line-2); color:var(--ink)}
+.ghost.icon{width:32px; padding:0; justify-content:center; font-size:14px}
+
+/* ─────────── hero ─────────── */
+.hero{position:relative; overflow:hidden; border-bottom:1px solid var(--line); background:var(--surface)}
+.hero::before{
+  content:""; position:absolute; inset:0; pointer-events:none;
+  background:
+    radial-gradient(680px 320px at 88% -30%, color-mix(in srgb, var(--glow) 16%, transparent), transparent 70%),
+    radial-gradient(560px 300px at 8% 120%, color-mix(in srgb, var(--accent) 12%, transparent), transparent 70%);
+}
+.hero::after{
+  content:""; position:absolute; inset:0; pointer-events:none; opacity:.5;
+  background-image:radial-gradient(circle at 1px 1px, var(--line-2) 1px, transparent 0);
+  background-size:26px 26px;
+  -webkit-mask-image:linear-gradient(180deg, rgba(0,0,0,.35), transparent 65%);
+  mask-image:linear-gradient(180deg, rgba(0,0,0,.35), transparent 65%);
+}
+.hero-in{position:relative; display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1.05fr); gap:28px; padding:26px 0 20px; align-items:end}
+@media(max-width:820px){.hero-in{grid-template-columns:1fr; gap:20px; padding:20px 0 16px}}
+.tagline{display:flex; align-items:center; gap:8px; font-size:11px; font-weight:600; letter-spacing:.13em; text-transform:uppercase; color:var(--muted)}
+.tagline .dot{width:6px; height:6px; border-radius:50%; background:var(--glow); box-shadow:0 0 0 4px color-mix(in srgb, var(--glow) 22%, transparent)}
+.headline{display:flex; align-items:baseline; gap:12px; flex-wrap:wrap; margin-top:8px}
+.headline .big{font-family:var(--mono); font-weight:600; font-size:clamp(44px,9vw,66px); letter-spacing:-.05em; line-height:1}
+.headline .unit{font-family:var(--disp); font-weight:700; font-size:18px; color:var(--ink-2)}
+.band{margin-top:16px; max-width:420px}
+.band .track{height:8px; border-radius:99px; background:var(--surface-3); position:relative; overflow:hidden}
+.band .track i{position:absolute; top:0; bottom:0; border-radius:99px; background:linear-gradient(90deg, var(--accent), var(--glow))}
+.band .track b{position:absolute; top:-3px; width:3px; height:14px; border-radius:2px; background:var(--ink)}
+.band .ends{display:flex; justify-content:space-between; margin-top:6px; font-size:11.5px; color:var(--muted)}
+.band .ends span{font-family:var(--mono)}
+
+.stats{display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:1px; background:var(--line); border:1px solid var(--line); border-radius:var(--r); overflow:hidden}
+@media(max-width:560px){.stats{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.stat{background:var(--surface); padding:13px 14px; display:flex; flex-direction:column; gap:2px; min-width:0}
+.stat .k{font-size:11px; color:var(--muted); font-weight:500; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+.stat .v{font-family:var(--mono); font-size:20px; font-weight:600; letter-spacing:-.035em; line-height:1.3}
+.stat .v small{font-family:var(--sans); font-size:11.5px; font-weight:500; color:var(--ink-2); letter-spacing:0}
+.stat .s{font-size:10.5px; color:var(--muted); line-height:1.45}
+
+.alertbar{
+  position:relative; display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+  padding:10px 14px; margin:0 0 18px; border-radius:var(--r-sm);
+  background:var(--crit-soft); color:var(--crit); font-size:12.5px; font-weight:500; line-height:1.5;
+}
+.alertbar b{font-weight:700}
+.alertbar .more{
+  margin-left:auto; border:1px solid currentColor; background:transparent; color:inherit;
+  border-radius:99px; padding:2px 11px; font-size:11.5px; font-weight:600; cursor:pointer;
+}
+.alertbar .more:hover{background:color-mix(in srgb, currentColor 12%, transparent)}
+@media(max-width:560px){.alertbar .more{margin-left:0}}
+
+/* ─────────── tabs ─────────── */
+.tabs{position:sticky; top:var(--hdr); z-index:45; background:color-mix(in srgb, var(--bg) 90%, transparent);
+  backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px); border-bottom:1px solid var(--line)}
+.tabs-in{display:flex; gap:4px; overflow-x:auto; scrollbar-width:none}
+.tabs-in::-webkit-scrollbar{display:none}
+.tabs button{
+  position:relative; border:0; background:transparent; cursor:pointer; white-space:nowrap;
+  padding:12px 13px 11px; font-size:13px; font-weight:600; color:var(--muted); letter-spacing:-.01em;
+}
+.tabs button:hover{color:var(--ink-2)}
+.tabs button[aria-selected="true"]{color:var(--ink)}
+.tabs button[aria-selected="true"]::after{
+  content:""; position:absolute; left:9px; right:9px; bottom:-1px; height:2.5px; border-radius:2px;
+  background:linear-gradient(90deg, var(--accent), var(--glow));
+}
+main{padding:20px 0 64px}
+.panel[hidden]{display:none}
+.panel{display:flex; flex-direction:column; gap:14px; animation:rise .22s ease}
+@keyframes rise{from{opacity:0; transform:translateY(6px)}to{opacity:1; transform:none}}
+
+/* ─────────── cards ─────────── */
+.card{background:var(--surface); border:1px solid var(--line); border-radius:var(--r); box-shadow:var(--sh-1)}
+.card.raised{box-shadow:var(--sh-2)}
+.ch{display:flex; align-items:center; gap:10px; flex-wrap:wrap; padding:14px 16px 0}
+.ch h3{font-size:14.5px; font-family:var(--disp); font-weight:700; letter-spacing:-.02em}
+.ch .note{font-size:11px; color:var(--muted); margin-left:auto}
+.cb{padding:12px 16px 16px}
+.g2{display:grid; grid-template-columns:1.35fr 1fr; gap:14px}
+.g3{display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:14px}
+@media(max-width:900px){.g2,.g3{grid-template-columns:1fr}}
+.lede{font-size:13px; color:var(--ink-2); margin:0 0 12px; max-width:66ch}
+
+/* ─────────── tables ─────────── */
+.tw{overflow-x:auto; -webkit-overflow-scrolling:touch}
+table{border-collapse:collapse; width:100%; font-size:13px}
+th,td{padding:8px 10px; text-align:right; border-bottom:1px solid var(--line); white-space:nowrap}
+th{font-size:10.5px; font-weight:600; color:var(--muted); letter-spacing:.05em; text-transform:uppercase; background:var(--surface-2)}
+th:first-child,td:first-child{text-align:left}
+td.n{font-family:var(--mono); font-variant-numeric:tabular-nums}
+tbody tr:hover{background:var(--surface-2)}
+tfoot td{font-weight:600; border-top:2px solid var(--line-2); border-bottom:0; background:var(--surface-2)}
+th.so{cursor:pointer; user-select:none}
+th.so::after{content:"↕"; opacity:.35; margin-left:4px; font-size:9px}
+th.so.asc::after{content:"↑"; opacity:1; color:var(--accent)}
+th.so.desc::after{content:"↓"; opacity:1; color:var(--accent)}
+@media(max-width:700px){ .opt{display:none} }
+.tag{display:inline-block; padding:1px 6px; border-radius:5px; font-size:10.5px; font-weight:600}
+.tag.t1{background:var(--s1-soft); color:var(--s1)}
+.tag.t2{background:var(--s2-soft); color:var(--s2)}
+.tag.t3{background:var(--s3-soft); color:var(--s3)}
+.tag.hi{background:var(--crit-soft); color:var(--crit)}
+.tag.new{background:var(--good-soft); color:var(--good)}
+
+/* ─────────── controls ─────────── */
+.bar{display:flex; gap:8px; flex-wrap:wrap; align-items:flex-end; padding:12px 16px; border-bottom:1px solid var(--line)}
+.seg{display:inline-flex; background:var(--surface-2); border:1px solid var(--line); border-radius:var(--r-sm); padding:2px; gap:2px}
+.seg button{border:0; background:transparent; padding:5px 11px; font-size:12.5px; font-weight:500; color:var(--ink-2); cursor:pointer; border-radius:var(--r-xs)}
+.seg button[aria-pressed="true"]{background:var(--accent); color:var(--accent-ink); font-weight:600}
+label.f{display:inline-flex; flex-direction:column; gap:3px; font-size:10.5px; color:var(--muted); font-weight:600; letter-spacing:.04em; text-transform:uppercase}
+select,input[type=text],input[type=number],input[type=search],textarea{
+  background:var(--surface-2); border:1px solid var(--line); border-radius:var(--r-sm);
+  padding:6px 9px; font-size:13px; min-width:0; color:var(--ink);
+}
+input[type=number]{font-family:var(--mono); text-align:right}
+textarea{width:100%; font-family:var(--mono); font-size:12px; line-height:1.6; resize:vertical}
+.btn{border:1px solid var(--line-2); background:var(--surface-2); color:var(--ink); padding:6px 13px;
+  border-radius:var(--r-sm); font-size:12.5px; font-weight:600; cursor:pointer}
+.btn:hover{background:var(--surface-3)}
+.btn.pri{background:var(--accent); border-color:var(--accent); color:var(--accent-ink)}
+.btn.pri:hover{filter:brightness(1.1)}
+.btn.sm{padding:4px 10px; font-size:11.5px}
+.push{margin-left:auto}
+
+/* ─────────── charts ─────────── */
+.chart{width:100%; display:block; overflow:visible}
+.chart text{font-family:var(--sans); fill:var(--muted); font-size:11px}
+.chart .val{font-family:var(--mono); font-weight:600; font-size:11.5px; fill:var(--ink)}
+.chart .cat{fill:var(--ink-2); font-weight:600; font-size:12px}
+.chart .grid{stroke:var(--line)}
+.cap{font-size:11.5px; color:var(--muted); margin:10px 0 0; display:flex; gap:14px; flex-wrap:wrap; align-items:center}
+.cap i{display:inline-block; width:14px; height:3px; border-radius:2px; margin-right:5px; vertical-align:3px}
+.cap i.bd{height:9px; border-radius:3px}
+.empty{display:flex; flex-direction:column; align-items:center; gap:9px; text-align:center; padding:34px 20px; color:var(--muted); font-size:13px}
+.empty strong{color:var(--ink-2); font-size:14px; font-weight:600; font-family:var(--disp)}
+
+/* ─────────── misc ─────────── */
+.mini{display:flex; flex-direction:column; gap:0}
+.mini .row{display:flex; align-items:center; gap:10px; padding:8px 0; border-bottom:1px dashed var(--line); font-size:13px}
+.mini .row:last-child{border-bottom:0}
+.mini .row .d{font-family:var(--mono); font-size:11.5px; color:var(--muted); width:74px; flex:none}
+.mini .row .p{margin-left:auto; font-family:var(--mono); font-weight:600}
+.kv{display:grid; grid-template-columns:auto 1fr; gap:6px 12px; font-size:12.5px; margin:0}
+.kv dt{color:var(--muted); white-space:nowrap}
+.kv dd{margin:0}
+.chip{display:inline-flex; align-items:center; gap:5px; padding:3px 9px; border-radius:99px; font-size:11px; font-weight:600; white-space:nowrap}
+.chip::before{content:""; width:5px; height:5px; border-radius:50%; background:currentColor}
+.chip.crit{background:var(--crit-soft); color:var(--crit)}
+.chip.warn{background:var(--warn-soft); color:var(--warn)}
+.chip.flat{background:var(--surface-3); color:var(--ink-2)}
+.chips{display:flex; gap:6px; flex-wrap:wrap}
+.callout{border-radius:var(--r-sm); padding:10px 12px; font-size:12.5px; line-height:1.55; background:var(--warn-soft); color:var(--warn)}
+.callout.crit{background:var(--crit-soft); color:var(--crit)}
+.callout.ok{background:var(--good-soft); color:var(--good)}
+.callout.mute{background:var(--surface-2); color:var(--ink-2); border:1px solid var(--line)}
+.callout b{font-weight:700}
+.dz{border:1.5px dashed var(--line-2); border-radius:var(--r); padding:20px; text-align:center; font-size:12.5px; color:var(--muted); background:var(--surface-2)}
+.dz.over{border-color:var(--glow); background:var(--accent-soft); color:var(--accent)}
+.dz strong{display:block; color:var(--ink-2); font-size:14px; font-family:var(--disp); font-weight:700; margin-bottom:3px}
+details.acc{border:1px solid var(--line); border-radius:var(--r); background:var(--surface)}
+details.acc+details.acc{margin-top:8px}
+details.acc summary{padding:12px 16px; cursor:pointer; font-size:13px; font-weight:600; list-style:none; display:flex; align-items:center; gap:8px}
+details.acc summary::-webkit-details-marker{display:none}
+details.acc summary::before{content:"›"; color:var(--muted); font-size:17px; transition:transform .15s; display:inline-block}
+details.acc[open] summary::before{transform:rotate(90deg)}
+details.acc .bd{padding:0 16px 16px; font-size:12.5px; color:var(--ink-2); line-height:1.75}
+details.acc .bd ul,details.acc .bd ol{margin:6px 0; padding-left:18px}
+details.acc .bd code{font-family:var(--mono); font-size:11.5px; background:var(--surface-3); padding:1px 5px; border-radius:4px}
+details.acc .bd pre{background:var(--surface-3); padding:10px 12px; border-radius:var(--r-sm); overflow-x:auto; font-family:var(--mono); font-size:11.5px; line-height:1.6}
+footer{border-top:1px solid var(--line); margin-top:34px; padding:20px 0 40px; font-size:11.5px; color:var(--muted); line-height:1.8}
+
+/* listings */
+.cards{display:grid; grid-template-columns:repeat(auto-fill,minmax(230px,1fr)); gap:10px; padding:14px 16px}
+.lst{border:1px solid var(--line); border-radius:var(--r-sm); padding:11px 12px; background:var(--surface-2); display:flex; flex-direction:column; gap:6px}
+.lst .r1{display:flex; align-items:baseline; gap:8px}
+.lst .price{font-family:var(--mono); font-size:18px; font-weight:600; letter-spacing:-.03em}
+.lst .meta{font-size:12px; color:var(--ink-2); display:flex; gap:8px; flex-wrap:wrap}
+.lst .star{margin-left:auto; background:none; border:0; cursor:pointer; font-size:15px; color:var(--line-2); padding:0 2px}
+.lst .star[aria-pressed="true"]{color:var(--s2)}
+
+/* listings list */
+.lsList{display:flex; flex-direction:column}
+.lrow{border-bottom:1px solid var(--line)}
+.lrow:last-child{border-bottom:0}
+.lrow.open{background:var(--surface-2)}
+.lhead{width:100%; display:flex; align-items:center; gap:9px; padding:11px 16px; background:none;
+  border:0; cursor:pointer; text-align:left; font:inherit}
+.lhead:hover{background:var(--surface-2)}
+.lprice{font-family:var(--mono); font-size:16px; font-weight:600; letter-spacing:-.03em; white-space:nowrap}
+.lprice em{font-style:normal; font-size:12px; font-weight:500; color:var(--muted); margin-left:3px}
+.lmeta{font-size:12.5px; color:var(--ink-2); white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+.lcnt{margin-left:auto; font-size:11px; font-weight:600; color:var(--accent); background:var(--accent-soft);
+  padding:2px 8px; border-radius:99px; white-space:nowrap}
+.lstar{font-size:15px; color:var(--line-2)}
+.lstar.on{color:var(--s2)}
+.lchev{color:var(--muted); font-size:17px; transition:transform .15s; display:inline-block}
+.lrow.open .lchev{transform:rotate(90deg)}
+.lbody{padding:2px 16px 14px; display:flex; flex-direction:column; gap:5px}
+.lmini{font-size:11.5px; color:var(--muted); font-family:var(--mono); padding-bottom:4px}
+.lag{display:grid; grid-template-columns:190px minmax(0,1fr) 62px; gap:10px; font-size:12px;
+  padding:5px 0; border-top:1px dashed var(--line)}
+.lag .an{color:var(--ink-2); font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.lag .am{color:var(--muted); overflow:hidden; text-overflow:ellipsis}
+.lag .ad{color:var(--muted); text-align:right; font-size:11px}
+@media(max-width:700px){
+  .lhead{flex-wrap:wrap; gap:6px 8px}
+  .lmeta{flex-basis:100%; order:5; white-space:normal}
+  .lag{grid-template-columns:1fr; gap:2px}
+  .lag .ad{text-align:left}
+}
+button.chip{border:0; cursor:pointer; font-family:inherit}
+button.chip.sel{background:var(--accent); color:var(--accent-ink)}
+
+/* simulator */
+.sim{display:grid; grid-template-columns:290px minmax(0,1fr)}
+@media(max-width:820px){.sim{grid-template-columns:1fr}}
+.sim-in{padding:15px 16px; border-right:1px solid var(--line); display:flex; flex-direction:column; gap:10px}
+@media(max-width:820px){.sim-in{border-right:0; border-bottom:1px solid var(--line)}}
+.sim-in label{display:grid; grid-template-columns:1fr 106px; align-items:center; gap:8px; font-size:12.5px; color:var(--ink-2)}
+.sim-in label input,.sim-in label select{width:100%}
+.sim-out{padding:15px 16px; display:flex; flex-direction:column; gap:14px}
+.rows{display:flex; flex-direction:column}
+.rw{display:flex; align-items:baseline; gap:10px; padding:6px 0; border-bottom:1px dashed var(--line); font-size:13.5px}
+.rw:last-child{border-bottom:0}
+.rw .lb{color:var(--ink-2)}
+.rw .vl{margin-left:auto; font-family:var(--mono); font-variant-numeric:tabular-nums; font-weight:500}
+.rw.tot{border-top:2px solid var(--line-2); margin-top:4px; padding-top:9px; font-weight:600; font-size:15px}
+.rw.tot .vl{font-size:18px; color:var(--accent)}
+.rw .sub{font-size:11px; color:var(--muted)}
+.eyebrow{font-size:10.5px; font-weight:700; letter-spacing:.14em; text-transform:uppercase; color:var(--muted); margin:0 0 6px}
+
+.tip{position:fixed; pointer-events:none; z-index:70; background:var(--surface); border:1px solid var(--line-2);
+  border-radius:var(--r-sm); padding:8px 10px; font-size:12px; box-shadow:var(--sh-2); opacity:0; transition:opacity .1s;
+  max-width:220px; line-height:1.5}
+.tip.on{opacity:1}
+.tip b{font-family:var(--mono); font-weight:600}
+.mapsvg{width:100%; height:auto; display:block; background:var(--surface-2); border-radius:var(--r-sm)}
+.tl{list-style:none; margin:0; padding:0}
+.tl li{display:grid; grid-template-columns:66px 1fr; gap:12px; padding:8px 0; border-bottom:1px solid var(--line); font-size:12.5px}
+.tl li:last-child{border-bottom:0}
+.tl .when{font-family:var(--mono); font-size:11px; color:var(--accent); font-weight:600; padding-top:2px}
+.tl .what b{display:block; font-weight:600; font-size:13px}
+.tl .what span{color:var(--ink-2); font-size:12px}
+</style>
+</head>
+<body>
+
+<header class="hdr">
+  <div class="wrap hdr-in">
+    <div class="mark">
+      <span class="glyph" aria-hidden="true">HG</span>
+      <div style="min-width:0">
+        <b>힐스테이트 기흥</b><br>
+        <span>기흥역 초역세권 · 976세대 · 2018.08</span>
+      </div>
+    </div>
+    <button class="ghost" id="syncBtn" title="데이터 갱신 상태">
+      <span id="syncDot" style="width:6px;height:6px;border-radius:50%;background:var(--muted);display:inline-block"></span>
+      <span id="syncTxt">데이터</span>
+    </button>
+    <button class="ghost icon" id="themeBtn" title="테마 전환" aria-label="테마 전환">◐</button>
+  </div>
+</header>
+
+<!-- ── 첫 화면: 핵심만 ────────────────────────────────── -->
+<section class="hero">
+  <div class="wrap hero-in">
+    <div>
+      <p class="tagline"><span class="dot"></span><span id="heroLabel">KB 일반 매매가</span></p>
+      <div class="headline">
+        <span class="big" id="heroBig">—</span>
+        <span class="unit" id="heroUnit"></span>
+      </div>
+      <div class="band">
+        <div class="track" id="heroTrack"></div>
+        <div class="ends"><span id="heroLo"></span><span id="heroHi"></span></div>
+      </div>
+    </div>
+    <div class="stats" id="heroStats"></div>
+  </div>
+  <div class="wrap"><div class="alertbar" id="alertbar"></div></div>
+</section>
+
+<nav class="tabs" aria-label="섹션">
+  <div class="wrap tabs-in" id="tabs" role="tablist">
+    <button role="tab" data-p="overview" aria-selected="true">개요</button>
+    <button role="tab" data-p="price"    aria-selected="false">평형·시세</button>
+    <button role="tab" data-p="deals"    aria-selected="false">실거래</button>
+    <button role="tab" data-p="listings" aria-selected="false">매물</button>
+    <button role="tab" data-p="calc"     aria-selected="false">계산기</button>
+    <button role="tab" data-p="place"    aria-selected="false">입지</button>
+    <button role="tab" data-p="data"     aria-selected="false">데이터</button>
+  </div>
+</nav>
+
+<main class="wrap">
+
+  <!-- ══ 개요 ══ -->
+  <div class="panel" id="p-overview" role="tabpanel">
+    <div class="g3">
+      <div class="card">
+        <div class="ch"><h3>평형별 시세</h3><span class="note">매매 · 전세</span></div>
+        <div class="cb"><svg class="chart" id="cQuote" role="img" aria-label="평형별 매매·전세 시세"></svg></div>
+      </div>
+      <div class="card">
+        <div class="ch"><h3>최근 실거래</h3><span class="note" id="recentNote"></span></div>
+        <div class="cb"><div class="mini" id="recent"></div></div>
+      </div>
+      <div class="card">
+        <div class="ch"><h3>단지 요약</h3></div>
+        <div class="cb"><dl class="kv" id="factSheet"></dl></div>
+      </div>
+    </div>
+    <div class="g2">
+      <div class="card">
+        <div class="ch"><h3>지금 사려면</h3><span class="note">규제지역 기준</span></div>
+        <div class="cb" id="buyNow"></div>
+      </div>
+      <div class="card">
+        <div class="ch"><h3>체크리스트</h3><span class="note">계약 전</span></div>
+        <div class="cb"><ol style="margin:0; padding-left:19px; font-size:13px; color:var(--ink-2); line-height:1.85">
+          <li>관할 구청 <b>토지거래허가</b> 신청 — 실거주 계획서·자금조달계획서 필요</li>
+          <li>LTV 40% 기준 <b>자기자본</b> 확보 여부, DSR 40% 별도 확인</li>
+          <li>등기부등본 권리관계, 관리비·장기수선충당금 정산</li>
+          <li>동·층·향에 따른 조망과 소음(42번 국도·철도) 현장 확인</li>
+          <li>주상복합 특성상 <b>전용률</b>과 관리비 수준 비교</li>
+        </ol></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ 평형·시세 ══ -->
+  <div class="panel" id="p-price" role="tabpanel" hidden>
+    <div class="g2">
+      <div class="card">
+        <div class="ch"><h3>평형별 매매·전세 시세</h3><span class="note" id="quoteNote"></span></div>
+        <div class="cb">
+          <div class="cap" style="margin:0 0 8px">
+            <span><i style="background:var(--s1)"></i>매매</span>
+            <span><i style="background:var(--s2)"></i>전세</span>
+          </div>
+          <svg class="chart" id="cQuote2" role="img" aria-label="평형별 매매·전세 시세"></svg>
+        </div>
+      </div>
+      <div class="card">
+        <div class="ch"><h3>평형별 전세가율</h3><span class="note">전세 ÷ 매매</span></div>
+        <div class="cb"><svg class="chart" id="cRatio" role="img" aria-label="평형별 전세가율"></svg></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="ch"><h3>타입별 구성</h3><span class="note" id="typeNote"></span></div>
+      <div class="tw cb">
+        <table id="typeTable">
+          <thead><tr>
+            <th>타입</th><th>평형</th><th class="opt">공급 ㎡</th><th>전용 ㎡</th><th>세대수</th>
+            <th class="opt">구성비</th><th class="opt">방/욕실</th><th>매매</th><th class="opt">전월세</th>
+          </tr></thead><tbody></tbody><tfoot></tfoot>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ 실거래 ══ -->
+  <div class="panel" id="p-deals" role="tabpanel" hidden>
+    <div class="card">
+      <div class="bar">
+        <div class="seg" id="trendDeal" role="group" aria-label="거래 유형">
+          <button data-v="매매" aria-pressed="true">매매</button>
+          <button data-v="전세" aria-pressed="false">전세</button>
+        </div>
+        <div class="seg" id="trendPy" role="group" aria-label="평형">
+          <button data-v="all" aria-pressed="true">전체</button>
+          <button data-v="31" aria-pressed="false">31평</button>
+          <button data-v="36" aria-pressed="false">36평</button>
+          <button data-v="41" aria-pressed="false">41평</button>
+        </div>
+        <label class="f">기간
+          <select id="trendRange">
+            <option value="12">1년</option><option value="24">2년</option>
+            <option value="36">3년</option><option value="0" selected>전체</option>
+          </select>
+        </label>
+      </div>
+      <div class="cb" id="trendBody"></div>
+    </div>
+    <div class="card">
+      <div class="bar">
+        <div class="seg" id="txDeal" role="group" aria-label="거래 유형">
+          <button data-v="all" aria-pressed="true">전체</button>
+          <button data-v="매매" aria-pressed="false">매매</button>
+          <button data-v="전세" aria-pressed="false">전세</button>
+          <button data-v="월세" aria-pressed="false">월세</button>
+        </div>
+        <label class="f">평형
+          <select id="txPy"><option value="all">전체</option><option value="31">31평</option><option value="36">36평</option><option value="41">41평</option></select>
+        </label>
+        <label class="f">검색
+          <input type="search" id="txSearch" placeholder="층·금액·날짜" style="width:130px">
+        </label>
+        <button class="btn sm push" id="txExport">CSV</button>
+      </div>
+      <div class="tw" id="txWrap"></div>
+    </div>
+  </div>
+
+  <!-- ══ 매물 ══ -->
+  <div class="panel" id="p-listings" role="tabpanel" hidden>
+
+    <div class="stats" id="lsStats"></div>
+    <div id="lsGap"></div>
+
+    <div class="g2">
+      <div class="card">
+        <div class="ch"><h3>타입별 호가 분포</h3><span class="note" id="distNote"></span></div>
+        <div class="cb">
+          <div class="cap" style="margin:0 0 8px">
+            <span><i style="background:var(--s1)"></i>31평</span>
+            <span><i style="background:var(--s2)"></i>36평</span>
+            <span><i style="background:var(--s3)"></i>41평</span>
+            <span><i style="background:var(--ink-2); height:9px; width:2px"></i>중위 호가</span>
+          </div>
+          <svg class="chart" id="cDist" role="img" aria-label="타입별 매매 호가 분포"></svg>
+        </div>
+      </div>
+      <div class="card">
+        <div class="ch"><h3>층대·동별</h3><span class="note">매매 기준</span></div>
+        <div class="cb">
+          <p class="eyebrow" style="margin:0 0 4px">층대별 중위 호가</p>
+          <svg class="chart" id="cBand" role="img" aria-label="층대별 중위 호가"></svg>
+          <p class="eyebrow" style="margin:14px 0 4px">동별 매물 수</p>
+          <svg class="chart" id="cDong" role="img" aria-label="동별 매물 수"></svg>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="ch"><h3>중개소 게시 추이</h3><span class="note">일자별 게시 건수</span></div>
+      <div class="cb"><svg class="chart" id="cPost" role="img" aria-label="일자별 중개소 게시 건수"></svg></div>
+    </div>
+
+    <div class="card">
+      <div class="bar">
+        <div class="seg" id="lsDeal" role="group" aria-label="거래 유형">
+          <button data-v="all" aria-pressed="true">전체</button>
+          <button data-v="매매" aria-pressed="false">매매</button>
+          <button data-v="전세" aria-pressed="false">전세</button>
+          <button data-v="월세" aria-pressed="false">월세</button>
+        </div>
+        <label class="f">타입<select id="lsType"><option value="all">전체</option></select></label>
+        <label class="f">동<select id="lsDong"><option value="all">전체</option></select></label>
+        <label class="f">층<select id="lsBand">
+          <option value="all">전체</option><option value="고">고층</option><option value="중">중층</option><option value="저">저층</option></select></label>
+        <label class="f">정렬<select id="lsSort">
+          <option value="price-asc">호가 낮은 순</option><option value="price-desc">호가 높은 순</option>
+          <option value="count-desc">중개소 많은 순</option><option value="new-desc">최근 게시 순</option></select></label>
+        <label class="f" style="text-transform:none; letter-spacing:0; font-size:12.5px; color:var(--ink-2); flex-direction:row; align-items:center; gap:5px; padding-bottom:5px">
+          <input type="checkbox" id="lsFav" style="min-width:auto"> 즐겨찾기
+        </label>
+        <button class="btn sm push" id="lsExport">JSON</button>
+      </div>
+      <div id="lsKeywords" style="padding:12px 16px 0"></div>
+      <div id="lsBody"></div>
+    </div>
+
+    <div class="card">
+      <div class="ch"><h3>매물 파일 올리기</h3><span class="note" id="lsStamp"></span></div>
+      <div class="cb" style="display:flex; flex-direction:column; gap:11px">
+        <div class="dz" id="lsDrop">
+          <strong>네이버 부동산 매물 파일을 여기에 놓으세요</strong>
+          .xlsx · .csv 파일, 또는 시트를 복사해 붙여넣기
+          <div style="margin-top:9px; display:flex; gap:8px; justify-content:center; flex-wrap:wrap">
+            <button class="btn sm pri" id="lsPick">파일 선택</button>
+            <button class="btn sm" id="lsPasteToggle">붙여넣기</button>
+            <a class="btn sm" id="naverLink" href="#" target="_blank" rel="noopener">네이버 부동산 열기 ↗</a>
+          </div>
+          <input type="file" id="lsFile" accept=".xlsx,.csv,.tsv,.txt" hidden>
+        </div>
+        <div id="lsPasteBox" hidden style="display:flex; flex-direction:column; gap:8px">
+          <textarea id="lsPasteArea" rows="6" placeholder="엑셀에서 표 전체(머리글 포함)를 복사해 붙여넣으세요."></textarea>
+          <div style="display:flex; gap:8px"><button class="btn pri" id="lsPasteRead">읽어들이기</button>
+          <button class="btn" id="lsPasteClear">지우기</button></div>
+        </div>
+        <div id="lsMsg"></div>
+        <details class="acc"><summary>필요한 열 형식</summary><div class="bd">
+          <p>네이버 부동산 매물 목록을 내려받은 그대로 올리면 됩니다. 머리글이 아래와 같아야 하고, 순서는 달라도 됩니다.</p>
+          <pre>동 | 매/전 | 가격 | 면적 | 층 | 향 | 정보 | 중개소 | 에이전트 | 등록일자</pre>
+          <ul>
+            <li><b>동일매물 묶음</b>: <code>↳</code>로 시작하는 행은 같은 물건을 올린 다른 중개소로 묶습니다.</li>
+            <li><b>가격</b>: <code>13억</code>, <code>11억 5,000</code>, <code>1억 5,000/230</code>(월세), <code>11억 5,000 ~12억 5,000</code>(범위) 모두 인식합니다.</li>
+            <li><b>층</b>: <code>고/49층</code> 같은 표기와 <code>39/49층</code> 같은 실층수 둘 다 처리합니다.</li>
+            <li><b>면적</b>: <code>120A-1/84m²</code>에서 타입과 전용면적을 분리합니다.</li>
+          </ul>
+        </div></details>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ 계산기 ══ -->
+  <div class="panel" id="p-calc" role="tabpanel" hidden>
+    <div class="card sim">
+      <div class="sim-in">
+        <label>매매가 (억)<input type="number" id="f_price" value="11.8" step="0.1" min="0"></label>
+        <label>전용면적 (㎡)<input type="number" id="f_area" value="72.3" step="0.01" min="0"></label>
+        <label>보유 주택 수<select id="f_houses"><option value="1">무주택 → 1주택</option><option value="2">1주택 → 2주택</option><option value="3">2주택 이상</option></select></label>
+        <label>자금 조달<select id="f_mode"><option value="loan">주담대 (실거주)</option><option value="gap">전세 승계 (갭)</option><option value="cash">전액 현금</option></select></label>
+        <label id="w_ltv">LTV (%)<input type="number" id="f_ltv" value="40" step="1" min="0" max="80"></label>
+        <label id="w_cap">대출 한도 상한 (억)<input type="number" id="f_cap" value="6" step="0.5" min="0"></label>
+        <label id="w_rate">금리 (%)<input type="number" id="f_rate" value="4.2" step="0.1" min="0"></label>
+        <label id="w_jeonse">전세보증금 (억)<input type="number" id="f_jeonse" value="6.75" step="0.05" min="0"></label>
+        <label>등기·법무 (%)<input type="number" id="f_reg" value="0.15" step="0.05" min="0"></label>
+        <label>보유 기간 (년)<input type="number" id="f_years" value="3" step="1" min="1" max="30"></label>
+        <label>연 상승률 (%)<input type="number" id="f_growth" value="3" step="0.5"></label>
+      </div>
+      <div class="sim-out">
+        <div id="simAlert"></div>
+        <div><p class="eyebrow">초기 자금</p><div class="rows" id="simCost"></div></div>
+        <div><p class="eyebrow">보유·처분 시나리오</p><div class="rows" id="simReturn"></div></div>
+      </div>
+    </div>
+    <p style="font-size:11.5px; color:var(--muted); margin:0">
+      취득세는 조정대상지역 중과와 전용 85㎡ 초과 농특세를 반영한 계산값, 보유세는 공시가격을 시세의 69%로 가정한 개략 추정입니다. 양도세는 포함하지 않았습니다.
+    </p>
+  </div>
+
+  <!-- ══ 입지 ══ -->
+  <div class="panel" id="p-place" role="tabpanel" hidden>
+    <div class="g2">
+      <div class="card">
+        <div class="ch"><h3>기흥역 반경</h3><span class="note">도보 시간은 개략치</span></div>
+        <div class="cb"><svg class="mapsvg" id="mapSvg" viewBox="0 0 520 420" role="img" aria-label="힐스테이트 기흥 주변 시설 개념도"></svg></div>
+      </div>
+      <div class="card">
+        <div class="ch"><h3>개발 호재 타임라인</h3></div>
+        <div class="cb"><ul class="tl" id="timeline"></ul></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="ch"><h3>기흥역세권 1지구 단지 비교</h3><span class="note">5개 단지 6,244세대</span></div>
+      <div class="cb"><svg class="chart" id="cNb" role="img" aria-label="단지별 세대수"></svg></div>
+    </div>
+  </div>
+
+  <!-- ══ 데이터 ══ -->
+  <div class="panel" id="p-data" role="tabpanel" hidden>
+    <div class="card">
+      <div class="ch"><h3>실거래가 — 국토교통부</h3><span class="note" id="dataStamp"></span></div>
+      <div class="cb" style="display:flex; flex-direction:column; gap:11px">
+        <div class="dz" id="dropzone">
+          <strong>CSV·JSON을 여기에 놓으세요</strong>
+          국토교통부 실거래가 공개시스템에서 내려받은 CSV, 또는 이 대시보드가 내보낸 JSON
+          <div style="margin-top:9px"><button class="btn sm" id="pickFile">파일 선택</button></div>
+          <input type="file" id="fileInput" accept=".csv,.json,.txt" hidden>
+        </div>
+        <div id="loadMsg"></div>
+      </div>
+    </div>
+    <details class="acc" open>
+      <summary>매일 자동 갱신 — GitHub Actions (권장)</summary>
+      <div class="bd">
+        <p><b>인증키는 계정당 하나</b>입니다. 이미 받으셨다면 새 키를 또 받을 필요 없이,
+        아래 API에 <b>활용신청만 추가</b>하면 같은 키로 호출됩니다(자동 승인).</p>
+        <table style="font-size:12px; margin:8px 0"><thead><tr>
+          <th>API</th><th>필요도</th><th>없으면</th></tr></thead><tbody>
+          <tr><td><a href="https://www.data.go.kr/data/15126469/openapi.do" target="_blank" rel="noopener">아파트 매매 실거래가 자료</a></td>
+              <td style="text-align:left"><span class="tag t1">보유 중</span></td><td style="text-align:left">매매 차트·테이블의 기본 소스</td></tr>
+          <tr><td><a href="https://www.data.go.kr/data/15126474/openapi.do" target="_blank" rel="noopener">아파트 전월세 실거래가 자료</a></td>
+              <td style="text-align:left"><span class="tag hi">추가 권장</span></td><td style="text-align:left">전세·월세 추이와 실거래 기준 전세가율이 비어 있음</td></tr>
+          <tr><td><a href="https://www.data.go.kr/data/15126468/openapi.do" target="_blank" rel="noopener">아파트 매매 실거래가 상세 자료</a></td>
+              <td style="text-align:left"><span class="tag t2">선택</span></td><td style="text-align:left">동(棟)·등기일자가 빠져 매물의 동별 비교가 안 됨</td></tr>
+        </tbody></table>
+        <p>수집 스크립트는 <b>상세 자료 → 기본 자료</b> 순으로 시도하고, 신청하지 않은 API는 자동으로 건너뛴 뒤
+        어떤 소스를 썼는지 로그와 <code>data/transactions.json</code>에 남깁니다. 지금 상태로도 매매는 정상 수집됩니다.</p>
+        <ol>
+          <li>저장소 <code>Settings → Secrets and variables → Actions</code>에 <code>DATA_GO_KR_KEY</code>로 <b>Decoding</b> 키 등록</li>
+          <li>푸시하면 매일 새벽 <code>data/transactions.json</code>이 갱신됩니다</li>
+        </ol>
+        <p><code>apis.data.go.kr</code>은 CORS 헤더를 주지 않아 정적 페이지에서 직접 <code>fetch</code>할 수 없습니다.
+        수집은 Actions에서, 페이지는 결과 JSON만 읽는 구조라 페이지에 키를 심지 않아도 됩니다.</p>
+        <pre>export DATA_GO_KR_KEY="발급받은_디코딩_키"
+node scripts/update.mjs --months 36</pre>
+      </div>
+    </details>
+    <details class="acc">
+      <summary>매물 — 네이버 부동산은 왜 자동이 아닌가</summary>
+      <div class="bd" id="naverWhy"></div>
+    </details>
+    <details class="acc">
+      <summary>출처와 기준일</summary>
+      <div class="bd" id="sourceList"></div>
+    </details>
+  </div>
+
+  <footer>
+    개인 참고용 정리 도구입니다. 시세·세액·수익률은 공개 자료를 바탕으로 한 추정치이며 실제 거래·신고 금액과 다를 수 있습니다.
+    투자 판단과 결과는 이용자 본인의 책임이며, 계약 전에는 등기부등본·관리비·중개사 확인을 거치시기 바랍니다.
+    토지거래허가구역 내 아파트 매수는 관할 구청 허가가 선행되어야 합니다.
+  </footer>
+</main>
+
+<div class="tip" id="tip" role="status" aria-live="polite"></div>
+
+<script>
+/* ═══════════════ DATA ═══════════════ */
+const SEED = {
+  complex:{
+    name:"힐스테이트 기흥", addr:"경기 용인시 기흥구 기흥역로 63 (구갈동 660)",
+    households:976, dongs:5, floors:"지하 2층 ~ 지상 49층", approved:"2018-08-24",
+    builder:"현대엔지니어링", parking:1270, parkingPer:1.3, far:517, bcr:69,
+    lawdCd:"41463",
+    naverUrl:"https://m.land.naver.com/search/result/%ED%9E%90%EC%8A%A4%ED%85%8C%EC%9D%B4%ED%8A%B8%EA%B8%B0%ED%9D%A5"
+  },
+  types:[
+    {name:"104A",  supply:104, exclusive:72.6, naver:72, py:31, units:42,  rooms:"3/2", sale:0,  rent:0},
+    {name:"104B",  supply:104, exclusive:72.3, naver:72, py:31, units:211, rooms:"3/2", sale:36, rent:0},
+    {name:"120A",  supply:120, exclusive:84.95,naver:84, py:36, units:169, rooms:"3/2", sale:17, rent:0},
+    {name:"120A-1",supply:120, exclusive:84.95,naver:84, py:36, units:256, rooms:"3/2", sale:36, rent:0},
+    {name:"120B",  supply:120, exclusive:84.95,naver:84, py:36, units:82,  rooms:"3/2", sale:5,  rent:1},
+    {name:"121C",  supply:121, exclusive:84.95,naver:84, py:36, units:128, rooms:"3/2", sale:8,  rent:4},
+    {name:"137A",  supply:137, exclusive:95.9, naver:95, py:41, units:88,  rooms:"3/2", sale:44, rent:0}
+  ],
+  kb:{ asOf:"2026-08-21", saleLow:10.6, saleMid:11.25, saleHigh:12.25, jeonseLow:6.35, jeonseMid:6.75, jeonseHigh:7.2 },
+  byPy:[
+    {py:31, label:"31평형", supply:"104㎡ / 전용 72㎡", units:253, sale:10.8, jeonse:5.8},
+    {py:36, label:"36평형", supply:"120·121㎡ / 전용 85㎡", units:635, sale:11.6, jeonse:6.3},
+    {py:41, label:"41평형", supply:"137㎡ / 전용 96㎡", units:88,  sale:12.4, jeonse:7.1}
+  ],
+  transactions:[
+    {date:"2026-06-30", deal:"매매", area:84.95, py:36, floor:47, amount:118000, src:"KB부동산"},
+    {date:"2026-07-04", deal:"전세", area:84.95, py:36, floor:34, amount:58800,  src:"KB부동산"}
+  ],
+  lsSeed:{updated:"2026-09-01",source:"네이버 부동산"},
+  listings:[{"id":"L001","dong":"203","deal":"월세","priceText":"1억 5,000/230","price":15000,"priceMax":null,"rent":230,"type":"121C","area":84.0,"py":36,"floor":null,"band":"고","face":"남동향","listed":"26.09.01","agents":[{"name":"기흥역힐스대표공인중개사사무소","memo":"시스템에어컨4 기흥역최단거리 생활권편리 작은방골프장뷰","date":"26.09.01","provider":"매경부동산 제공"},{"name":"기흥역힐스퀸Queen공인중개사사무소","memo":"36C,시 스 템 4대,기흥역과 AK몰 근접동, 작은방 골프장뷰","date":"26.08.31","provider":"매경부동산 제공"},{"name":"기흥역신화공인중개사사무소","memo":"빠른 입주 가능. 협의 입주가능. 시에4","date":"26.08.29","provider":"매경부동산 제공"},{"name":"기흥역힐스큰부자공인중개사사무소","memo":"빠른입주가능,에어컨4대,작은방골프장뷰, 방3개 수납많은구조","date":"26.08.29","provider":"매경부동산 제공"},{"name":"기흥역현대힐스테이트공인중개사사무소","memo":"기흥역에서가장가까운동,골프장뷰,시스템에어컨4대,코킹,중문,깨끗해요,강추","date":"26.08.20","provider":"매경부동산 제공"}],"first":"26.08.20","last":"26.09.01","count":5},{"id":"L002","dong":"204","deal":"월세","priceText":"4억/120","price":40000,"priceMax":null,"rent":120,"type":"121C","area":84.0,"py":36,"floor":null,"band":"고","face":"남동향","listed":"26.09.01","agents":[{"name":"기흥역힐스대표공인중개사사무소","memo":"전망좋은 시원한뷰 시스템에어컨 2대 쇼핑몰이용편리","date":"26.09.01","provider":"매경부동산 제공"},{"name":"기흥역힐스큰부자공인중개사사무소","memo":"에어컨2대,1월입주,채광좋은라인,2세대엘리베이터2대라인","date":"26.08.29","provider":"매경부동산 제공"},{"name":"기흥역현대힐스테이트공인중개사사무소","memo":"조망굿,시스템에어컨,인덕션,냉장고,햇살가득,관리상태깨끗해요","date":"26.08.27","provider":"매경부동산 제공"}],"first":"26.08.27","last":"26.09.01","count":3},{"id":"L003","dong":"204","deal":"전세","priceText":"7억 2,000","price":72000,"priceMax":null,"rent":0,"type":"121C","area":84.0,"py":36,"floor":null,"band":"고","face":"남동향","listed":"26.09.01","agents":[{"name":"기흥역힐스큰부자공인중개사사무소","memo":"1월입주,에어컨2대,채광좋음,방3개구조,수납많음","date":"26.09.01","provider":"매경부동산 제공"},{"name":"기흥역힐스대표공인중개사사무소","memo":"조망 최고뷰 채광좋고 AK 쇼핑몰 이용편리 초역세권 시스템에어컨2대","date":"26.09.01","provider":"매경부동산 제공"},{"name":"기흥역현대힐스테이트공인중개사사무소","memo":"조망굿,시스템에어컨대,풍부한수납,인덕션,냉장고,관리상태깨끗","date":"26.08.27","provider":"매경부동산 제공"}],"first":"26.08.27","last":"26.09.01","count":3},{"id":"L004","dong":"202","deal":"매매","priceText":"11억 3,000","price":113000,"priceMax":null,"rent":0,"type":"104B","area":72.0,"py":31,"floor":null,"band":"고","face":"남동향","listed":"26.08.31","agents":[{"name":"기흥역힐스퀸Queen공인중개사사무소","memo":"31B, 입 주 가 능, 고 층, 기흥역세권, AK몰 슬세권,최고인프라","date":"26.08.31","provider":"매경부동산 제공"},{"name":"기흥역힐스(031-284-1344)공인중개사사무소","memo":"기흥역힐스테이트  ak몰,기흥역근접동, 입주협의,추천올림,","date":"26.09.01","provider":"매경부동산 제공"},{"name":"기흥역만세공인중개사사무소","memo":"기흥역3분.AK몰.상가이용편리.입주협의가능.하시임장가능","date":"26.08.03","provider":"부동산써브 제공"}],"first":"26.08.03","last":"26.09.01","count":3},{"id":"L005","dong":"202","deal":"매매","priceText":"11억 5,000","price":115000,"priceMax":null,"rent":0,"type":"104B","area":72.0,"py":31,"floor":null,"band":"중","face":"남동향","listed":"26.08.31","agents":[{"name":"기흥역힐스(031-284-1344)공인중개사사무소","memo":"기흥역힐스테이트 기흥역근접동,아늑한동, 내부관리굿, 수납굿, 추천올림","date":"26.08.31","provider":"매경부동산 제공"},{"name":"기흥역부자공인중개사사무소","memo":"기흥초역세권,관리된집, 입주협의, 셔세권,AK이용편리","date":"26.08.31","provider":"매경부동산 제공"},{"name":"기흥역힐스대표공인중개사사무소","memo":"기흥역과 ak몰 입구동 단지조망 입주일협의 주인거주로 컨디션굿","date":"26.08.31","provider":"매경부동산 제공"},{"name":"기흥역힐스퀸Queen공인중개사사무소","memo":"31B, 컨 디 션 최 상, 입 주 협 의, 주 인 거 주, 최고의인프라","date":"26.08.29","provider":"매경부동산 제공"},{"name":"기흥역OK(031-284-2900)공인중개사사무소","memo":"기흥역 초역세권, 도배, 탄성, 주인거주로 관리 잘된 집, 입주협의","date":"26.08.28","provider":"매경부동산 제공"},{"name":"기흥역왕대박공인중개사사무소","memo":"입주협의 주인거주로 관리상태굿 최근도배,탄성,줄눈","date":"26.08.21","provider":"매경부동산 제공"},{"name":"기흥역미래공인중개사사무소","memo":"입주, 기흥역 초 초 역세권 인기타입, 관리최상급 좋아요, 강추드림","date":"26.08.06","provider":"매경부동산 제공"}],"first":"26.08.06","last":"26.08.31","count":7},{"id":"L006","dong":"202","deal":"매매","priceText":"11억 5,000","price":115000,"priceMax":null,"rent":0,"type":"104B","area":72.0,"py":31,"floor":null,"band":"중","face":"남동향","listed":"26.08.31","agents":[{"name":"기흥역힐스대표공인중개사사무소","memo":"올수리된 깨끗한 집 인덕션 기흥역세권 셔세권 입주가능","date":"26.08.31","provider":"매경부동산 제공"},{"name":"더샵공인중개사사무소","memo":"기흥역 AK 연결, 전체 인테리어, 주인거주로 관리잘된 집, 입주협의","date":"26.08.29","provider":"매경부동산 제공"},{"name":"기흥역왕대박공인중개사사무소","memo":"기흥초역세권 AK몰인접,교통생활편리 화이트톤올수리 집컨디션굿 환기채광굿","date":"26.08.12","provider":"매경부동산 제공"}],"first":"26.08.12","last":"26.08.31","count":3},{"id":"L007","dong":"203","deal":"매매","priceText":"11억 5,000 ~12억 5,000","price":115000,"priceMax":125000,"rent":0,"type":"104B","area":72.0,"py":31,"floor":39,"band":"고","face":"남동향","listed":"26.08.31","agents":[{"name":"기흥역힐스대표공인중개사사무소","memo":"풀인테리어 인덕션 식세기 전망최고 선호동 입주협의","date":"26.08.31","provider":"매경부동산 제공"},{"name":"기흥역힐스(031-284-1344)공인중개사사무소","memo":"기흥역직통연결동, 최고로얄, 올인테리어굿, 완전전망굿, 추천올림","date":"26.08.31","provider":"매경부동산 제공"},{"name":"기흥역힐스퀸Queen공인중개사사무소","memo":"31B,퀸 추 천. 풀 인 테 리 어, 확 트인뷰, 입주날짜 협의","date":"26.08.31","provider":"매경부동산 제공"},{"name":"기흥역퍼스트올공인중개사사무소","memo":"세련된올수리 기흥역연결동 .호텔식욕실.테슬라인덕션 .윤현상재타일시공","date":"26.08.29","provider":"매경부동산 제공"},{"name":"기흥역힐스큰부자공인중개사사무소","memo":"입주가능,로얄동로얄층,현대적이고 세련된 모던한 인테리어, 신혼부부강추","date":"26.08.29","provider":"매경부동산 제공"},{"name":"더샵공인중개사사무소","memo":"AK 바로옆, 탁트인 시티뷰, 귀한 입주매물, 특올수리, 입주협의","date":"26.08.29","provider":"매경부동산 제공"},{"name":"기흥역부자공인중개사사무소","memo":"풀인테리어,막힘없는뷰, 채광굿,기흥역제일가까운동,입주협의","date":"26.08.28","provider":"매경부동산 제공"},{"name":"기흥역OK(031-284-2900)공인중개사사무소","memo":"기흥역 연결 로얄동, 최고급 자재 풀인테리어, 전망최고, 인덕션, 입주","date":"26.08.24","provider":"매경부동산 제공"},{"name":"기흥역골드공인중개사사무소","memo":"입주 신혼 추천 풀가전 인테리어 기흥역 초 인접동으로 교통 생활 편리","date":"26.08.27","provider":"매경부동산 제공"},{"name":"기흥역탑(031-284-1230)공인중개사사무소","memo":"TOP,특올수리,신혼부부강추,뷰맛집,인테리어최상,특추천","date":"26.08.15","provider":"매경부동산 제공"},{"name":"기흥역왕대박공인중개사사무소","memo":"입주매물 추천 막힘없는 뻥뷰최고급자재 특올수리,테슬라인덕션,입주협의","date":"26.08.12","provider":"매경부동산 제공"},{"name":"기흥역센트럴푸르지오공인중개사사무소","memo":"풀인테리어 시원한뷰 기흥역초역세권 추천해요","date":"26.08.11","provider":"매경부동산 제공"},{"name":"기흥역롯데공인중개사사무소","memo":"풀옵션 뷰굿 전철역 연결","date":"26.08.10","provider":"매경부동산 제공"},{"name":"기흥역신화공인중개사사무소","memo":"AK몰 기흥역 연결. 가까운동. 입주. 올수리.","date":"26.08.15","provider":"매경부동산 제공"},{"name":"기흥역미래공인중개사사무소","memo":"빠른 화 이 트  최신 인테리어 뻥뚫린 전망,  채광, 야경도 굿","date":"26.08.06","provider":"매경부동산 제공"},{"name":"ACE공인중개사사무소","memo":"동탄까지 조망가능하고 채광 굿, 호불호 없는 인테리어 시공,입주일 협의","date":"26.08.12","provider":"매경부동산 제공"},{"name":"기흥역올라공인중개사사무소","memo":"AK몰 기흥역 연결동 로얄동 추가인테리어 컨디션최상, 조망 및 채광 최상","date":"26.08.05","provider":"아실 제공"},{"name":"기흥역만세공인중개사사무소","memo":"기흥역연결동.확신한뷰.완벽한인테리어.협의가능.하시임장가능","date":"26.08.03","provider":"부동산써브 제공"},{"name":"기흥역현대힐스테이트공인중개사사무소","memo":"세련된감각의 특인테이어,초초역세권,조망굿,인덕션,식세기,냉장고,강추","date":"26.08.08","provider":"매경부동산 제공"},{"name":"기흥역미소(031-287-5525)공인중개사사무소","memo":"기흥역연결단지 최근완전특올수리  전망 채광 최고 특급추천  즉시입주","date":"26.08.08","provider":"매경부동산 제공"},{"name":"기흥센트럴푸르지오공인중개사사무소","memo":"조망 일조좋고  풀인테리어한 멋진 집.기흥역에서 가장 가까운동.입주협의가","date":"26.08.05","provider":"매경부동산 제공"}],"first":"26.08.03","last":"26.08.31","count":21},{"id":"L008","dong":"201","deal":"매매","priceText":"12억 5,000","price":125000,"priceMax":null,"rent":0,"type":"120A-1","area":84.0,"py":36,"floor":6,"band":"저","face":"남동향","listed":"26.08.31","agents":[{"name":"기흥역힐스퀸Queen공인중개사사무소","memo":"36A1, 시스템에어컨4대, 트인 뷰로 골프장뷰 나옴, 세안고","date":"26.08.31","provider":"매경부동산 제공"},{"name":"기흥역힐스대표공인중개사사무소","memo":"탁트인 예쁜 골프장뷰  집상태 깨끗 시스템에어컨4대 세안고 매매","date":"26.08.31","provider":"매경부동산 제공"},{"name":"기흥역로얄부동산중개사무소","memo":"초역세권 트인뷰 판상형 시에4대 세안고","date":"26.08.31","provider":"부동산포스 제공"},{"name":"기흥역힐스(031-284-1344)공인중개사사무소","memo":"기흥역힐스테이트 골프장뷰, 전세안고, 추천,시에4, 필로티층, 확트인전망","date":"26.08.31","provider":"매경부동산 제공"},{"name":"기흥역힐스큰부자공인중개사사무소","memo":"층간소음걱정없는필로티, 세안고매매, 시스템에어컨4대","date":"26.08.29","provider":"매경부동산 제공"},{"name":"기흥역탑(031-284-1230)공인중개사사무소","memo":"TOP.  시에4대, 골프장뷰, 관리 잘 됨, 세안고.","date":"26.08.29","provider":"매경부동산 제공"},{"name":"삼촌공인중개사사무소","memo":"매일영업,전세안고매매,골프장뷰,시스템에어컨4대,중문,기흥역초역세권","date":"26.08.29","provider":"매경부동산 제공"},{"name":"ACE공인중개사사무소","memo":"수원CC골프장뷰, 시스템에어컨4대, 전세안고 갭투자, 관리상태 좋음.","date":"26.08.28","provider":"매경부동산 제공"},{"name":"기흥역부자공인중개사사무소","memo":"골프장뷰,시에4대,긴전세안고,관리된집,방4개,기흥역세권","date":"26.08.20","provider":"매경부동산 제공"},{"name":"기흥역OK(031-284-2900)공인중개사사무소","memo":"로얄동, 골프장뷰, 긴세안고, 시에4, 깔끔한 관리, 트인뷰,추천매물","date":"26.08.20","provider":"매경부동산 제공"},{"name":"기흥역왕대박공인중개사사무소","memo":"전면막힘없는 뷰 채광환기좋음 긴세안고 시에4대,","date":"26.08.12","provider":"매경부동산 제공"},{"name":"기흥역미래공인중개사사무소","memo":"세안고, 시스템4대, 앞  탁트인 시원한 탄천뷰 , 인기 A타입,","date":"26.08.06","provider":"매경부동산 제공"},{"name":"기흥역만세공인중개사사무소","memo":"기흥역3분.시스템에어컨4.세안고.협의가능","date":"26.08.06","provider":"부동산써브 제공"},{"name":"기흥센트럴푸르지오공인중개사사무소","memo":"전세안고.피로티층.골뷰쪽 전망트임.시스템에어컨4대","date":"26.08.05","provider":"매경부동산 제공"},{"name":"기흥역센트럴푸르지오공인중개사사무소","memo":"전세안고매매. 시에4대 판상형 광역버스이용편리 탄천뷰","date":"26.08.05","provider":"매경부동산 제공"},{"name":"기흥역더오르리공인중개사사무소","memo":"안정적인뷰,  로얄동 , 시스템에어컨4대  갭투추천","date":"26.08.04","provider":"매경부동산 제공"},{"name":"센트럴광장공인중개사사무소","memo":"세안고매매,시스템에어컨4대,트인라인,로얄","date":"26.08.04","provider":"매경부동산 제공"},{"name":"기흥역현대힐스테이트공인중개사사무소","memo":"수원cc골프장조망,층간소음걱정x,시스템에어컹4대,관리상태A급,추천드림","date":"26.08.06","provider":"매경부동산 제공"},{"name":"기흥역롯데공인중개사사무소","memo":"시스템에어컨4 세안고","date":"26.08.04","provider":"매경부동산 제공"},{"name":"기흥역코끼리공인중개사사무소","memo":"로얄동, 골프뷰, 판상형, 시스템4, 세안고","date":"26.08.04","provider":"매경부동산 제공"}],"first":"26.08.04","last":"26.08.31","count":20},{"id":"L009","dong":"204","deal":"매매","priceText":"12억 5,000","price":125000,"priceMax":null,"rent":0,"type":"121C","area":84.0,"py":36,"floor":null,"band":"고","face":"남동향","listed":"26.09.01","agents":[{"name":"동현아공인중개사사무소","memo":"주인거주,시스템에어컨4대","date":"26.09.01","provider":"부동산뱅크 제공"},{"name":"기흥역코끼리공인중개사사무소","memo":"정상입주,시스템4대,실링펜,깔끔합니다.","date":"26.08.27","provider":"매경부동산 제공"}],"first":"26.08.27","last":"26.09.01","count":2},{"id":"L010","dong":"201","deal":"매매","priceText":"12억 5,000","price":125000,"priceMax":null,"rent":0,"type":"120A-1","area":84.0,"py":36,"floor":null,"band":"저","face":"남동향","listed":"26.08.24","agents":[],"first":"26.08.24","last":"26.08.24","count":1},{"id":"L011","dong":"205","deal":"매매","priceText":"12억 5,000","price":125000,"priceMax":null,"rent":0,"type":"104B","area":72.0,"py":31,"floor":null,"band":"중","face":"남동향","listed":"26.08.18","agents":[],"first":"26.08.18","last":"26.08.18","count":1},{"id":"L012","dong":"204","deal":"매매","priceText":"13억","price":130000,"priceMax":null,"rent":0,"type":"120A-1","area":84.0,"py":36,"floor":null,"band":"중","face":"남동향","listed":"26.09.01","agents":[],"first":"26.09.01","last":"26.09.01","count":1},{"id":"L013","dong":"204","deal":"매매","priceText":"13억","price":130000,"priceMax":null,"rent":0,"type":"121C","area":84.0,"py":36,"floor":null,"band":"고","face":"남동향","listed":"26.08.31","agents":[{"name":"기흥역힐스퀸Queen공인중개사사무소","memo":"36C, 전세안고, 일조 多,인프라 굿, 초 역세권","date":"26.08.31","provider":"매경부동산 제공"},{"name":"기흥역힐스큰부자공인중개사사무소","memo":"세안고매매,채광좋고 기흥역연결편리","date":"26.08.29","provider":"매경부동산 제공"},{"name":"기흥역힐스대표공인중개사사무소","memo":"AK쇼핑몰 이용 편리  전망 좋은 시원한 뷰  일조 풍부 세안고 초역세권","date":"26.08.28","provider":"매경부동산 제공"},{"name":"기흥역현대힐스테이트공인중개사사무소","memo":"탁트인조망,층간소음x,장기세안고,관리상태굿,햇살풍부한집,강추","date":"26.08.27","provider":"매경부동산 제공"},{"name":"기흥역만세공인중개사사무소","memo":"기흥역3분.세안고.투자강추.전면동.협의가능","date":"26.08.21","provider":"부동산써브 제공"},{"name":"기흥역왕대박공인중개사사무소","memo":"긴세안고 기흥초역세권 투자로 좋은매물 막힘없는 뷰 층간소음걱정없음","date":"26.08.21","provider":"매경부동산 제공"},{"name":"기흥역더오르리공인중개사사무소","memo":"기흥역초역세권,ak몰가까운동,트인뷰,갭투추천","date":"26.08.18","provider":"매경부동산 제공"}],"first":"26.08.18","last":"26.08.31","count":7},{"id":"L014","dong":"203","deal":"매매","priceText":"13억","price":130000,"priceMax":null,"rent":0,"type":"120A","area":84.0,"py":36,"floor":null,"band":"고","face":"남동향","listed":"26.08.31","agents":[{"name":"기흥역힐스대표공인중개사사무소","memo":"시스템에어컨4 밝고깨끗한좋은집  상권이용편리함 입주협의","date":"26.08.31","provider":"매경부동산 제공"},{"name":"기흥역힐스(031-284-1344)공인중개사사무소","memo":"기흥역과 AK몰 직통 연결동 , 선호동, 시에4, 채광굿, 내부관리굿","date":"26.08.31","provider":"매경부동산 제공"},{"name":"기흥역더오르리공인중개사사무소","memo":"AK몰연결동,상권이용편리,시에4대,입주협의","date":"26.08.28","provider":"매경부동산 제공"},{"name":"기흥역신화공인중개사사무소","memo":"AK 기흥역 연결. 시에4. 풀옵션. 밝고 환한집.","date":"26.08.08","provider":"매경부동산 제공"}],"first":"26.08.08","last":"26.08.31","count":4},{"id":"L015","dong":"204","deal":"매매","priceText":"13억","price":130000,"priceMax":null,"rent":0,"type":"120A-1","area":84.0,"py":36,"floor":null,"band":"고","face":"남동향","listed":"26.08.29","agents":[],"first":"26.08.29","last":"26.08.29","count":1},{"id":"L016","dong":"204","deal":"매매","priceText":"13억","price":130000,"priceMax":null,"rent":0,"type":"120A-1","area":84.0,"py":36,"floor":null,"band":"중","face":"남동향","listed":"26.08.29","agents":[{"name":"기흥역현대힐스테이트공인중개사사무소","memo":"탁트인뷰,시스템에어컨4,음식물처리기,층간소음x,깨끗해요,빠른입주가","date":"26.08.29","provider":"매경부동산 제공"},{"name":"기흥역힐스대표공인중개사사무소","memo":"트인 전망 로얄동층 시스템에어컨4 세안고매매","date":"26.08.28","provider":"매경부동산 제공"}],"first":"26.08.28","last":"26.08.29","count":2},{"id":"L017","dong":"203","deal":"매매","priceText":"13억","price":130000,"priceMax":null,"rent":0,"type":"120A","area":84.0,"py":36,"floor":null,"band":"중","face":"남동향","listed":"26.08.21","agents":[{"name":"기흥역힐스(031-284-1344)공인중개사사무소","memo":"기흥역힐스테이트  기흥역직통연결동, 시에4, 최상급관리, 주전세 가능","date":"26.08.21","provider":"매경부동산 제공"},{"name":"기흥역OK(031-284-2900)공인중개사사무소","memo":"기흥역 초역세권, 아늑한 단지뷰, 시에 4대, 주인거주로 관리최상","date":"26.08.11","provider":"매경부동산 제공"},{"name":"기흥센트럴푸르지오공인중개사사무소","memo":"최근 시에4대설치.LEDe등.주전세도 가능.아주깨끗하고 관리잘된집","date":"26.08.08","provider":"매경부동산 제공"},{"name":"기흥역골드공인중개사사무소","memo":"기흥역 AK몰 초인접 동 시스템 4 입주 집 상태 최상 임장하시면 더좋음","date":"26.08.06","provider":"매경부동산 제공"}],"first":"26.08.06","last":"26.08.21","count":4},{"id":"L018","dong":"205","deal":"매매","priceText":"13억 5,000","price":135000,"priceMax":null,"rent":0,"type":"137A","area":95.0,"py":41,"floor":11,"band":"저","face":"남동향","listed":"26.09.01","agents":[{"name":"기흥역힐스대표공인중개사사무소","memo":"초역세권 대형 상권이용편리 골프장뷰 관리잘 된 집  입주협의","date":"26.09.01","provider":"매경부동산 제공"},{"name":"기흥역힐스(031-284-1344)공인중개사사무소","memo":"기흥역힐스테이트 골프장뷰, 내부관리굿, 햇살가득, 추천올림","date":"26.09.01","provider":"매경부동산 제공"},{"name":"기흥역힐스퀸Queen공인중개사사무소","memo":"95A . 초 역세권. 주인 거주 관리 최상. 일조 多, 채광","date":"26.08.31","provider":"매경부동산 제공"},{"name":"구성역이편한단지내탑(274-8945)공인중개사사무소","memo":"초역세권,초몰세권,상태 좋음,입주시기 협의 가능,환기와채광우수.방4개","date":"26.09.01","provider":"부동산써브 제공"},{"name":"기흥역힐스큰부자공인중개사사무소","memo":"입주협의가능,주인거주로 관리잘된집,방4개구조,기흥초역세권","date":"26.08.29","provider":"매경부동산 제공"},{"name":"기흥역코끼리공인중개사사무소","memo":"하시입주가능,초역세권,집상태 깨끗합니다.","date":"26.09.01","provider":"매경부동산 제공"},{"name":"기흥역OK(031-284-2900)공인중개사사무소","memo":"관리상태 최상, 방4, 투인원,입주협의,대형평수","date":"26.08.22","provider":"매경부동산 제공"},{"name":"기흥역왕대박공인중개사사무소","memo":"추천 방4개,주인거주로 관리잘된집  골프장탄천뷰 채광좋고 환기잘되요","date":"26.08.21","provider":"매경부동산 제공"},{"name":"현진공인중개사사무소","memo":"초역세권이며 골프장 전망에  깨끗하게 관리되어 최상입니다.","date":"26.08.21","provider":"부동산렛츠 제공"},{"name":"평화공인중개사사무소","memo":"깔끔하게 관리잘한집,집보기편함,입주 협의가능","date":"26.08.13","provider":"매경부동산 제공"},{"name":"기흥역더오르리공인중개사사무소","memo":"초역세권,조망좋음,방4개,입주가능,관리잘된 집","date":"26.08.07","provider":"매경부동산 제공"},{"name":"기흥역현대힐스테이트공인중개사사무소","memo":"조망굿,방4,협의가,식세기,줄눈,햇살풍부,깨끗한관리상태,시립어린이집","date":"26.08.06","provider":"매경부동산 제공"}],"first":"26.08.06","last":"26.09.01","count":12},{"id":"L019","dong":"204","deal":"매매","priceText":"13억 5,000","price":135000,"priceMax":null,"rent":0,"type":"120A-1","area":84.0,"py":36,"floor":null,"band":"고","face":"남동향","listed":"26.08.31","agents":[{"name":"기흥역힐스대표공인중개사사무소","memo":"기흥역과 ak몰 편리한동 트인 시티뷰 11월이후 언제든지 입주협의","date":"26.08.31","provider":"매경부동산 제공"},{"name":"기흥역힐스(031-284-1344)공인중개사사무소","memo":"기흥역힐스테이트 확트인 전망굿, 햇살가득, 층간소음무 , 11월입주협의","date":"26.08.31","provider":"매경부동산 제공"},{"name":"삼촌공인중개사사무소","memo":"매일영업,집주인대출5억까지가능,11월부터입주협의,중문","date":"26.08.29","provider":"매경부동산 제공"},{"name":"ACE공인중개사사무소","memo":"탁트인 기흥호수공원 수원시가지뷰, 층간소음 걱정 없는 탑층뷰,입주일 협의","date":"26.08.12","provider":"매경부동산 제공"},{"name":"망포역 파발마 공인중개사 사무소","memo":"집주인대출가능매물,기흥역연결,AK플라자단지상가,탁트인조망, 초고층매물","date":"26.08.02","provider":"부동산뱅크 제공"}],"first":"26.08.02","last":"26.08.31","count":5},{"id":"L020","dong":"201","deal":"매매","priceText":"13억 5,000","price":135000,"priceMax":null,"rent":0,"type":"120A-1","area":84.0,"py":36,"floor":null,"band":"고","face":"남동향","listed":"26.08.31","agents":[{"name":"기흥역힐스대표공인중개사사무소","memo":"시스템에어컨4 화이트필름 골프장전망  채광좋은 집 세안고매매","date":"26.08.31","provider":"매경부동산 제공"},{"name":"기흥역롯데공인중개사사무소","memo":"선호동 선호타입 골프장뷰  시에","date":"26.08.24","provider":"매경부동산 제공"},{"name":"기흥역더오르리공인중개사사무소","memo":"초역세권,골프장뷰,시스템에어컨4대,현관인테리어,갭투추천","date":"26.08.17","provider":"매경부동산 제공"}],"first":"26.08.17","last":"26.08.31","count":3},{"id":"L021","dong":"205","deal":"매매","priceText":"13억 5,000","price":135000,"priceMax":null,"rent":0,"type":"120B","area":84.0,"py":36,"floor":null,"band":"고","face":"남서향","listed":"26.08.29","agents":[{"name":"삼촌공인중개사사무소","memo":"매일영업,입주협의,탁트인뷰,중문,식세기,인덕션,간접조명,로얄라인","date":"26.08.29","provider":"매경부동산 제공"},{"name":"기흥역현대힐스테이트공인중개사사무소","memo":"탁트인조망,식세기,인덕션,방4,중문,우물조명,인기구조,햇살가득,강추","date":"26.08.29","provider":"매경부동산 제공"},{"name":"기흥역OK(031-284-2900)공인중개사사무소","memo":"강추, 선호동 인기라인, 전망과 채광 좋음, 식세기, 인덕션, 주인거주","date":"26.08.28","provider":"매경부동산 제공"},{"name":"기흥역만세공인중개사사무소","memo":"기흥역3분.선호귀한타입.완벽한뷰.하시임장가능.협의가능","date":"26.08.21","provider":"부동산써브 제공"},{"name":"기흥역더오르리공인중개사사무소","memo":"탁트인뷰,채광최고,방4개,식세기,인덕션,로얄라인,입주협의","date":"26.08.06","provider":"매경부동산 제공"}],"first":"26.08.06","last":"26.08.29","count":5},{"id":"L022","dong":"201","deal":"매매","priceText":"13억 5,000","price":135000,"priceMax":null,"rent":0,"type":"120A-1","area":84.0,"py":36,"floor":null,"band":"중","face":"남동향","listed":"26.08.03","agents":[],"first":"26.08.03","last":"26.08.03","count":1},{"id":"L023","dong":"203","deal":"매매","priceText":"14억","price":140000,"priceMax":null,"rent":0,"type":"121C","area":84.0,"py":36,"floor":null,"band":"고","face":"남동향","listed":"26.08.03","agents":[],"first":"26.08.03","last":"26.08.03","count":1},{"id":"L024","dong":"201","deal":"매매","priceText":"15억","price":150000,"priceMax":null,"rent":0,"type":"137A","area":95.0,"py":41,"floor":null,"band":"저","face":"남동향","listed":"26.09.01","agents":[],"first":"26.09.01","last":"26.09.01","count":1},{"id":"L025","dong":"203","deal":"매매","priceText":"15억","price":150000,"priceMax":null,"rent":0,"type":"120A","area":84.0,"py":36,"floor":null,"band":"고","face":"남서향","listed":"26.09.01","agents":[{"name":"기흥역힐스(031-284-1344)공인중개사사무소","memo":"기흥역힐스테이트 완전특추천, 조정가,시에3, 기흥역 AK＆ 직통 연결","date":"26.09.01","provider":"매경부동산 제공"},{"name":"기흥역힐스퀸Queen공인중개사사무소","memo":"최 상 의 파 노 라 마 뷰, 풀 인테리어, 시 스 템 3대, 입주 협의","date":"26.08.31","provider":"매경부동산 제공"},{"name":"기흥역힐스대표공인중개사사무소","memo":"트인뷰 석양 및 채광좋음 지하철 AK 최고의라인 화이트인테리어 입주가능","date":"26.08.31","provider":"매경부동산 제공"},{"name":"ACE공인중개사사무소","memo":"동탄 기흥호수공원까지 막힘없는 뷰,선호하는 동층. AC3,화이트인테리","date":"26.08.29","provider":"매경부동산 제공"},{"name":"기흥역힐스큰부자공인중개사사무소","memo":"입주협의가능,에어컨3대,전망최고,로얄동층,인테리어된집","date":"26.08.29","provider":"매경부동산 제공"},{"name":"기흥역만세공인중개사사무소","memo":"","date":"26.08.29","provider":"부동산써브 제공"},{"name":"기흥역더오르리공인중개사사무소","memo":"탁트인뷰 채광좋음,시에3, 지하철 AK 최고의라인, 화이트인테리어 입주","date":"26.08.28","provider":"매경부동산 제공"},{"name":"기흥역현대힐스테이트공인중개사사무소","memo":"뻥뚫린조망굿,빠른입주,시에어컨3,화이트톤인테리어,LED,방4,추천올림","date":"26.08.15","provider":"매경부동산 제공"},{"name":"기흥센트럴푸르지오공인중개사사무소","memo":"일조 조망 최고라인.시에3대.화이트톤 인테리어.입주가능.기흥초역세","date":"26.08.05","provider":"매경부동산 제공"}],"first":"26.08.05","last":"26.09.01","count":9},{"id":"L026","dong":"201","deal":"매매","priceText":"15억","price":150000,"priceMax":null,"rent":0,"type":"137A","area":95.0,"py":41,"floor":null,"band":"저","face":"남동향","listed":"26.08.29","agents":[{"name":"기흥역힐스큰부자공인중개사사무소","memo":"방4개,에어컨5대,골프장뷰,여유로운잔금가능","date":"26.08.29","provider":"매경부동산 제공"},{"name":"기흥역파크플러스공인중개사사무소","memo":"추천,에어컨5대,부분인테리어,아이키우기 좋은집,옵션많음,기흥역초역세권","date":"26.08.13","provider":"매경부동산 제공"}],"first":"26.08.13","last":"26.08.29","count":2},{"id":"L027","dong":"201","deal":"매매","priceText":"16억","price":160000,"priceMax":null,"rent":0,"type":"137A","area":95.0,"py":41,"floor":43,"band":"고","face":"남동향","listed":"26.08.31","agents":[{"name":"기흥역힐스(031-284-1344)공인중개사사무소","memo":"기흥역힐스테이트 인테리어 굿, 파노라마 골프장 뷰 굿, 시에4, 추천올림","date":"26.08.31","provider":"매경부동산 제공"},{"name":"기흥역힐스퀸Queen공인중개사사무소","memo":"41A, 골프장 특급뷰, 풀인테리어, 시스템4대,","date":"26.08.31","provider":"매경부동산 제공"},{"name":"기흥역탑(031-284-1230)공인중개사사무소","memo":"TOP.이쁜집,특올수리,시스템에어컨4대,골프장뷰,AK몰,기흥역초역세권","date":"26.08.29","provider":"매경부동산 제공"},{"name":"기흥역힐스큰부자공인중개사사무소","memo":"입주협의가능,각방마다골프장뷰,시스템에어컨,풀옵션","date":"26.08.29","provider":"매경부동산 제공"},{"name":"더샵공인중개사사무소","memo":"파노라마 골프장뷰, 화이트인테리어, 시에 4대, 주인거주, 입주협의","date":"26.08.29","provider":"매경부동산 제공"},{"name":"기흥역OK(031-284-2900)공인중개사사무소","memo":"골프장뷰, 앞이트여 전망과 채광 좋음, 큰방4개, 시에4, 화이트인테리어","date":"26.08.28","provider":"매경부동산 제공"},{"name":"기흥역부자공인중개사사무소","memo":"골프장조망권,시에4대 ,화이트인테리어,방4개,주인거주,입주협의","date":"26.08.28","provider":"매경부동산 제공"},{"name":"기흥역코끼리공인중개사사무소","memo":"올수리, 시스템4, 골프뷰,AK연결","date":"26.08.28","provider":"매경부동산 제공"},{"name":"기흥역더오르리공인중개사사무소","memo":"시에4 큰방4 , 골프장뷰 채광 최고 주인거주 관리 잘된집","date":"26.08.28","provider":"매경부동산 제공"},{"name":"기흥역힐스대표공인중개사사무소","memo":"골프장뷰와 채광이 최고  화이트풀인테리어 시에4 큰방4 입주협의","date":"26.08.27","provider":"매경부동산 제공"},{"name":"기흥역힐스롯데공인중개사사무소","memo":"특올수리,주인거주로 관리잘된 집,탁트인 골프장뷰,시에4대","date":"26.08.27","provider":"매경부동산 제공"},{"name":"NEO공인중개사사무소","memo":"주인거주,올수리 인테리어, 천정용에어컨, 방충망설치,","date":"26.08.27","provider":"부동산뱅크 제공"},{"name":"기흥역왕대박공인중개사사무소","memo":"기흥초역세권 막힘없는 뻥뷰 화이트풀인테리어,에4,바닥대리석시공 입주협의","date":"26.08.21","provider":"매경부동산 제공"},{"name":"기흥역만세공인중개사사무소","memo":"기흥역5분.풀인테리어.골프장뷰.협의가능","date":"26.08.21","provider":"부동산써브 제공"},{"name":"삼촌공인중개사사무소","memo":"매일영업,골프장뷰,올수리,주인거주,입주협의,시에4대,중문,안전방충망","date":"26.08.16","provider":"매경부동산 제공"},{"name":"ACE공인중개사사무소","memo":"","date":"26.08.12","provider":"매경부동산 제공"},{"name":"기흥역미소(031-287-5525)공인중개사사무소","memo":"기흥역 AK＆ 연결단지 올인테리어 풀옵션 cc뷰 전망굿 특급매물임","date":"26.08.11","provider":"매경부동산 제공"},{"name":"기흥역롯데공인중개사사무소","memo":"시스템에어컨풀 골프장뷰 주인거주","date":"26.08.10","provider":"매경부동산 제공"},{"name":"기흥역현대힐스테이트공인중개사사무소","memo":"","date":"26.08.15","provider":"매경부동산 제공"}],"first":"26.08.10","last":"26.08.31","count":19},{"id":"L028","dong":"205","deal":"매매","priceText":"16억","price":160000,"priceMax":null,"rent":0,"type":"137A","area":95.0,"py":41,"floor":null,"band":"중","face":"남동향","listed":"26.08.31","agents":[{"name":"기흥역힐스퀸Queen공인중개사사무소","memo":"41A,화이트와 그레이의 최신 인테리어,수원C.C뷰, 시스템4대, 초역세","date":"26.08.31","provider":"매경부동산 제공"},{"name":"기흥역OK(031-284-2900)공인중개사사무소","memo":"전체화이트인테리어, 시에4, 방4, 로얄층, 입주협의","date":"26.08.28","provider":"매경부동산 제공"},{"name":"기흥역미소(031-287-5525)공인중개사사무소","memo":"기흥역연결단지  AK＆ 연결 시에4 감각적인 화이트 인테리어 수원cc뷰","date":"26.08.26","provider":"매경부동산 제공"},{"name":"기흥역퍼스트올공인중개사사무소","memo":"기흥역슬세권.채광좋아 뜻 Ak  연결단지 . 시에4 수원 cc뷰","date":"26.08.24","provider":"매경부동산 제공"},{"name":"기흥역파크(264-0088)공인중개사사무소","memo":"시에4대외 인테리어,전망채광굿,기흥역연결,","date":"26.08.20","provider":"매경부동산 제공"},{"name":"기흥역센트럴푸르지오공인중개사사무소","memo":"화이트인테리어 시스템에어컨4  침실4 입주가능 추천해요","date":"26.08.18","provider":"매경부동산 제공"},{"name":"선우공인중개사사무소","memo":"기흥역과 AK몰 직통연결, 세련된화이트톤, 초역세권 슬세권,  즉시입주","date":"26.08.18","provider":"부동산써브 제공"}],"first":"26.08.18","last":"26.08.31","count":7},{"id":"L029","dong":"201","deal":"매매","priceText":"16억","price":160000,"priceMax":null,"rent":0,"type":"137A","area":95.0,"py":41,"floor":null,"band":"고","face":"남동향","listed":"26.08.24","agents":[],"first":"26.08.24","last":"26.08.24","count":1},{"id":"L030","dong":"201","deal":"매매","priceText":"16억 5,000","price":165000,"priceMax":null,"rent":0,"type":"137A","area":95.0,"py":41,"floor":null,"band":"고","face":"남동향","listed":"26.08.24","agents":[],"first":"26.08.24","last":"26.08.24","count":1}],
+  neighbors:[
+    {name:"기흥역 센트럴·파크 푸르지오", units:2488},
+    {name:"기흥역 더샵", units:1394},
+    {name:"힐스테이트 기흥", units:976, self:true},
+    {name:"기흥역 지웰 푸르지오", units:723},
+    {name:"기흥역 롯데캐슬 레이시티", units:663}
+  ],
+  timeline:[
+    {when:"2024.03", title:"GTX-A 수서~동탄 개통", body:"구성역 정차 · 삼성역 정식 개통(2028) 시 서울역 20분대"},
+    {when:"2025.03", title:"용인 플랫폼시티 착공", body:"판교 테크노밸리 약 4배 규모, 2030 완공 목표"},
+    {when:"2026.06", title:"조정대상지역·투기과열지구", body:"07.01부터 LTV 70%→40% 즉시 적용", kind:"crit"},
+    {when:"2026.07", title:"토지거래허가구역 발효", body:"기흥구 전역 아파트 · 실거주 목적만 허가", kind:"crit"},
+    {when:"2028",    title:"GTX-A 삼성역 정식 개통", body:"구성역 → 강남 접근성 추가 개선"},
+    {when:"2030",    title:"플랫폼시티 완공 목표", body:"반도체·AI·MICE 유치, 8조원 규모"}
+  ],
+  sources:[
+    {l:"KB부동산 — KB시세·타입별 세대수·매물 수", w:"2026-08-21 기준", u:"https://kbland.kr/se/c/30612"},
+    {l:"리치고 — 평형별 매매·전세 시세", w:"2026-08-26 조회", u:"https://m.richgo.ai/realty/danji/a9tpnUl"},
+    {l:"나무위키 — 힐스테이트 기흥 단지 제원", w:"2026-08-26 조회", u:"https://namu.wiki/w/%ED%9E%90%EC%8A%A4%ED%85%8C%EC%9D%B4%ED%8A%B8%20%EA%B8%B0%ED%9D%A5"},
+    {l:"나무위키 — 기흥역세권개발사업", w:"2026-08-26 조회", u:"https://namu.wiki/w/%EA%B8%B0%ED%9D%A5%EC%97%AD%EC%84%B8%EA%B6%8C%EA%B0%9C%EB%B0%9C%EC%82%AC%EC%97%85"},
+    {l:"경기일보 — 기흥구 전역 토지거래허가구역 시행", w:"2026-07-02", u:"https://www.kyeonggi.com/article/20260702580216"},
+    {l:"한경 부동산밸류업센터 — 규제지역 대출·세금 변화", w:"2026-07-07", u:"https://landvalueup.hankyung.com/issuecheck-2026-0707-0700"}
+  ]
+};
+
+const S={ data:structuredClone(SEED), tab:"overview",
+  trend:{deal:"매매",py:"all",range:0}, tx:{deal:"all",py:"all",q:"",sort:"date",dir:-1,limit:50},
+  favs:new Set(), lsMeta:{}, lsKw:null, lsDeal:"all", lsSeeded:true };
+
+/* ═══ utils ═══ */
+const $=(s,r=document)=>r.querySelector(s);
+const $$=(s,r=document)=>[...r.querySelectorAll(s)];
+const eok=v=>(Math.round(v*100)/100).toString()+"억";
+function won(man){ if(man==null||isNaN(man)) return "—";
+  const e=Math.floor(man/10000), r=Math.round(man%10000);
+  return e? `${e}억${r? " "+r.toLocaleString():""}` : r.toLocaleString()+"만"; }
+const pyOf=a=>a<79?31:a<90?36:41;  // 104형 72㎡ / 120·121형 84.95㎡ / 137형 95.9㎡
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const safe=(fn,fb)=>{ try{ return fn(); }catch(e){ return fb; } };
+const cssv=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+/* ═══ theme ═══ */
+(function(){
+  const sv=safe(()=>localStorage.getItem("ghd-theme"),null);
+  if(sv) document.documentElement.dataset.theme=sv;
+  $("#themeBtn").addEventListener("click",()=>{
+    const cur=document.documentElement.dataset.theme || (matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light");
+    const nx=cur==="dark"?"light":"dark";
+    document.documentElement.dataset.theme=nx;
+    safe(()=>localStorage.setItem("ghd-theme",nx));
+    drawAll();
+  });
+})();
+
+/* ═══ tooltip ═══ */
+const tipEl=$("#tip");
+function tip(html,x,y){
+  tipEl.innerHTML=html; tipEl.classList.add("on");
+  const r=tipEl.getBoundingClientRect();
+  tipEl.style.left=clamp(x-r.width/2,8,innerWidth-r.width-8)+"px";
+  tipEl.style.top=(y-r.height-12<8? y+16 : y-r.height-12)+"px";
+}
+const untip=()=>tipEl.classList.remove("on");
+
+/* ═══ hero ═══ */
+function renderHero(){
+  const d=S.data, kb=d.kb;
+  const lastSale=d.transactions.filter(t=>t.deal==="매매").sort((a,b)=>b.date.localeCompare(a.date))[0];
+  const lastJ=d.transactions.filter(t=>t.deal==="전세").sort((a,b)=>b.date.localeCompare(a.date))[0];
+  const asks=d.listings.filter(l=>l.deal==="매매").map(l=>l.price);
+  const askMin=asks.length?Math.min(...asks):null, askMed=median(asks);
+  const postings=d.listings.reduce((s,l)=>s+l.count,0);
+  const ppy=Math.round(kb.saleMid*10000/31);
+
+  $("#heroLabel").textContent=`KB 일반 매매가 · ${kb.asOf} 기준`;
+  $("#heroBig").textContent=String(+kb.saleMid.toFixed(2));
+  $("#heroUnit").textContent=`억원 · 평당 ${ppy.toLocaleString()}만`;
+  const lo=kb.saleLow, hi=kb.saleHigh, span=hi-lo;
+  $("#heroTrack").innerHTML=`<i style="left:0; width:${((kb.saleMid-lo)/span*100).toFixed(1)}%"></i>
+    <b style="left:calc(${((kb.saleMid-lo)/span*100).toFixed(1)}% - 1.5px)"></b>`;
+  $("#heroLo").textContent="하위 "+eok(lo);
+  $("#heroHi").textContent="상위 "+eok(hi);
+
+  $("#heroStats").innerHTML=[
+    {k:"최근 매매 실거래", v:lastSale?won(lastSale.amount):"—",
+     s:lastSale?`${lastSale.date} · ${lastSale.floor}층`:"데이터 연결 필요"},
+    {k:"KB 일반 전세가", v:eok(kb.jeonseMid),
+     s:lastJ?`최근 전세 ${won(lastJ.amount)}`:kb.asOf},
+    {k:"전세가율", v:(kb.jeonseMid/kb.saleMid*100).toFixed(1)+"%", s:"갭 "+eok(kb.saleMid-kb.jeonseMid)},
+    asks.length
+      ? {k:"매매 최저 호가", v:won(askMin), s:`고유 ${d.listings.length}건 · 중위 ${won(askMed)}`}
+      : {k:"매매 매물", v:d.types.reduce((s,t)=>s+t.sale,0)+"<small>건</small>", s:"KB 집계 · 매물 파일 미연결"}
+  ].map(c=>`<div class="stat"><span class="k">${c.k}</span><span class="v">${c.v}</span><span class="s">${c.s}</span></div>`).join("");
+
+  $("#alertbar").innerHTML=`
+    <span class="chips">
+      <span class="chip crit">토지거래허가구역</span>
+      <span class="chip warn">조정·투기과열</span>
+      <span class="chip flat">LTV 40%</span>
+    </span>
+    <span>2026.07.05 ~ 2027.12.31 · 기흥구 전역 아파트는 <b>실거주 목적만</b> 허가 — 전세 낀 매수 불가</span>
+    <button class="more" id="alertMore">규제 자세히</button>`;
+  $("#alertMore").addEventListener("click",()=>{ go("calc"); setTimeout(()=>$("#simAlert")?.scrollIntoView({block:"center"}),80); });
+}
+
+/* ═══ 개요 ═══ */
+function renderOverview(){
+  const d=S.data, c=d.complex, kb=d.kb;
+  const rec=[...d.transactions].sort((a,b)=>b.date.localeCompare(a.date)).slice(0,6);
+  $("#recentNote").textContent=d.transactions.length>2? d.transactions.length.toLocaleString()+"건 수집" : "국토부 연결 필요";
+  $("#recent").innerHTML=rec.length? rec.map(t=>`
+    <div class="row">
+      <span class="d">${t.date.slice(2)}</span>
+      <span class="tag ${t.py===31?"t1":t.py===36?"t2":"t3"}">${t.py}평</span>
+      <span style="color:var(--ink-2); font-size:12px">${t.deal} · ${t.floor}층</span>
+      <span class="p">${won(t.amount)}</span>
+    </div>`).join("")
+    : `<div class="empty"><strong>연결된 거래가 없습니다</strong>데이터 탭에서 국토부 실거래가를 불러오세요.</div>`;
+
+  $("#factSheet").innerHTML=[
+    ["세대수", `${c.households.toLocaleString()}세대 · ${c.dongs}개동`],
+    ["층수", c.floors],
+    ["입주", c.approved.replace(/-/g,".")+" (9년차)"],
+    ["시공", c.builder],
+    ["주차", `${c.parking.toLocaleString()}대 · 세대당 ${c.parkingPer}대`],
+    ["용적률", `${c.far}% · 건폐율 ${c.bcr}%`],
+    ["교통", "수인분당선·용인에버라인 기흥역 직결"],
+    ["생활", "AK플라자 기흥점 2층 통로 연결"]
+  ].map(([k,v])=>`<dt>${k}</dt><dd>${v}</dd>`).join("");
+
+  const need=(kb.saleMid*0.6).toFixed(2);
+  const asks=d.listings.filter(l=>l.deal==="매매").map(l=>l.price);
+  const askRow = asks.length ? `<p style="font-size:12.5px; color:var(--ink-2); margin:10px 0 0">
+      현재 나와 있는 매매 호가는 <b>${won(Math.min(...asks))} ~ ${won(Math.max(...asks))}</b>
+      (고유 ${asks.length}건, 중위 ${won(median(asks))}). 호가 기준이면 자기자본은
+      <b>${eok(Math.min(...asks)/10000*0.6)}</b> 이상이 필요합니다.</p>` : "";
+  $("#buyNow").innerHTML=`
+    <div class="rows" style="font-size:13.5px">
+      <div class="rw"><span class="lb">기준 매매가 <span class="sub">KB 일반가</span></span><span class="vl">${eok(kb.saleMid)}</span></div>
+      <div class="rw"><span class="lb">주담대 최대 <span class="sub">LTV 40%</span></span><span class="vl">${eok(kb.saleMid*0.4)}</span></div>
+      <div class="rw tot"><span class="lb">필요 자기자본</span><span class="vl">${eok(+need)} +</span></div>
+    </div>
+    ${askRow}
+    <p style="font-size:12px; color:var(--muted); margin:10px 0 0">
+      취득세·중개보수·등기비용은 별도이고, 수도권 규제지역 주담대 한도 상한과 DSR 40%가 추가로 걸립니다.
+      계산기 탭에서 조건을 바꿔가며 확인할 수 있습니다.</p>`;
+}
+
+/* ═══ SVG ═══ */
+const NS="http://www.w3.org/2000/svg";
+function el(t,a={},x){ const n=document.createElementNS(NS,t);
+  for(const k in a) n.setAttribute(k,a[k]); if(x!=null) n.textContent=x; return n; }
+function reset(svg,w,h){ svg.innerHTML=""; svg.setAttribute("viewBox",`0 0 ${w} ${h}`); svg.style.height=h+"px"; }
+const wOf=(svg,fb)=>svg.clientWidth||svg.parentElement?.clientWidth||fb;
+
+function chartQuote(id, compact){
+  const svg=$("#"+id); if(!svg) return;
+  const rows=S.data.byPy, W=wOf(svg,520), padL=compact?54:70, padR=compact?52:62;
+  const rowH=compact?46:54, H=rows.length*rowH+14;
+  reset(svg,W,H);
+  const max=Math.max(...rows.map(r=>r.sale))*1.14, X=v=>padL+(W-padL-padR)*(v/max);
+  const c1=cssv("--s1"), c2=cssv("--s2");
+  rows.forEach((r,i)=>{
+    const top=i*rowH+8;
+    svg.appendChild(el("text",{x:0,y:top+(compact?14:18),class:"cat","font-size":compact?"11.5":"12"},r.label));
+    if(!compact) svg.appendChild(el("text",{x:0,y:top+33,"font-size":"10.5"},r.units.toLocaleString()+"세대"));
+    const bh=compact?13:15, gap=compact?17:20;
+    [[r.sale,c1,top+(compact?1:4)],[r.jeonse,c2,top+(compact?1:4)+gap]].forEach(([v,c,y])=>{
+      const w=Math.max(X(v)-padL,3);
+      svg.appendChild(el("rect",{x:padL,y,width:w,height:bh,rx:4,fill:c}));
+      svg.appendChild(el("text",{x:padL+w+6,y:y+bh-2.5,class:"val","font-size":compact?"10.5":"11.5"},eok(v)));
+    });
+  });
+}
+function chartRatio(){
+  const svg=$("#cRatio"); if(!svg) return;
+  const rows=S.data.byPy.map(r=>({...r,ratio:r.jeonse/r.sale*100}));
+  const W=wOf(svg,360), padL=58, padR=50, rowH=46, H=rows.length*rowH+26;
+  reset(svg,W,H);
+  const X=v=>padL+(W-padL-padR)*(v/100), c=cssv("--s2");
+  [0,25,50,75,100].forEach(g=>{
+    svg.appendChild(el("line",{x1:X(g),y1:6,x2:X(g),y2:H-20,class:"grid","stroke-dasharray":g?"2 3":""}));
+    svg.appendChild(el("text",{x:X(g),y:H-6,"text-anchor":"middle","font-size":"10"},g+"%"));
+  });
+  rows.forEach((r,i)=>{
+    const y=i*rowH+14;
+    svg.appendChild(el("text",{x:0,y:y+15,class:"cat"},r.label));
+    const w=Math.max(X(r.ratio)-padL,3);
+    svg.appendChild(el("rect",{x:padL,y,width:w,height:18,rx:4,fill:c}));
+    svg.appendChild(el("text",{x:padL+w+6,y:y+14,class:"val"},r.ratio.toFixed(1)+"%"));
+  });
+}
+function chartNb(){
+  const svg=$("#cNb"); if(!svg) return;
+  const rows=S.data.neighbors, W=wOf(svg,760), padL=Math.min(190,W*0.36), padR=66, rowH=36, H=rows.length*rowH+10;
+  reset(svg,W,H);
+  const max=Math.max(...rows.map(r=>r.units))*1.08, X=v=>padL+(W-padL-padR)*(v/max);
+  rows.forEach((r,i)=>{
+    const y=i*rowH+9;
+    svg.appendChild(el("text",{x:0,y:y+14,class:"cat","font-weight":r.self?"700":"500",
+      fill:r.self?cssv("--ink"):cssv("--ink-2"),"font-size":"11.5"}, r.name.length>15? r.name.slice(0,15)+"…":r.name));
+    const w=Math.max(X(r.units)-padL,3);
+    svg.appendChild(el("rect",{x:padL,y:y+1,width:w,height:17,rx:4,fill:r.self?cssv("--s1"):cssv("--line-2")}));
+    svg.appendChild(el("text",{x:padL+w+7,y:y+14,class:"val"},r.units.toLocaleString()+"세대"));
+  });
+}
+
+/* ═══ 추이 ═══ */
+function renderTrend(){
+  const host=$("#trendBody"); if(!host) return;
+  const {deal,py,range}=S.trend;
+  let tx=S.data.transactions.filter(t=>t.deal===deal);
+  if(py!=="all") tx=tx.filter(t=>String(t.py)===py);
+  if(range){ const cut=new Date(); cut.setMonth(cut.getMonth()-range); tx=tx.filter(t=>new Date(t.date)>=cut); }
+  const M={}; tx.forEach(t=>{ const m=t.date.slice(0,7); (M[m]=M[m]||[]).push(t.amount); });
+  const keys=Object.keys(M).sort();
+  if(keys.length<2){
+    host.innerHTML=`<div class="empty">
+      <strong>${keys.length?"표본이 1개월치뿐입니다":"연결된 실거래가 없습니다"}</strong>
+      ${keys.length?"추이를 그리려면 2개월 이상 필요합니다.":"국토부 실거래가를 연결하면 월별 평균·최고가와 거래량이 채워집니다."}
+      <button class="btn sm" onclick="go('data')">데이터 연결</button></div>`;
+    return;
+  }
+  host.innerHTML=`<svg class="chart" id="cLine" role="img" aria-label="월별 ${deal} 추이"></svg>
+    <p class="cap">
+      <span><i style="background:var(--s1)"></i>월 평균 ${deal}가</span>
+      <span><i class="bd" style="background:var(--s1); opacity:.25"></i>월 최저–최고</span>
+      <span style="margin-left:auto">표본 ${tx.length}건 · ${keys[0]} ~ ${keys[keys.length-1]}</span>
+    </p>
+    <p class="eyebrow" style="margin:16px 0 2px">월별 거래량</p>
+    <svg class="chart" id="cVol" role="img" aria-label="월별 거래량"></svg>`;
+  const st=keys.map(k=>{ const a=M[k];
+    return {m:k,avg:a.reduce((s,v)=>s+v,0)/a.length,max:Math.max(...a),min:Math.min(...a),n:a.length}; });
+  const svg=$("#cLine"), W=wOf(svg,700), H=224, pL=52, pR=14, pT=14, pB=24;
+  reset(svg,W,H);
+  const lo=Math.min(...st.map(s=>s.min))*.97, hi=Math.max(...st.map(s=>s.max))*1.03;
+  const X=i=>pL+(W-pL-pR)*(st.length===1?.5:i/(st.length-1));
+  const Y=v=>pT+(H-pT-pB)*(1-(v-lo)/(hi-lo||1));
+  for(let g=0;g<=4;g++){ const v=lo+(hi-lo)*g/4, y=Y(v);
+    svg.appendChild(el("line",{x1:pL,y1:y,x2:W-pR,y2:y,class:"grid","stroke-dasharray":"2 4"}));
+    svg.appendChild(el("text",{x:pL-8,y:y+4,"text-anchor":"end","font-size":"10",class:"num"},(v/10000).toFixed(1)+"억")); }
+  const c1=cssv("--s1");
+  const band=st.map((s,i)=>`${X(i)},${Y(s.max)}`).concat(st.map((s,i)=>{const j=st.length-1-i; return `${X(j)},${Y(st[j].min)}`;})).join(" ");
+  svg.appendChild(el("polygon",{points:band,fill:c1,opacity:.14}));
+  svg.appendChild(el("polyline",{points:st.map((s,i)=>`${X(i)},${Y(s.avg)}`).join(" "),
+    fill:"none",stroke:c1,"stroke-width":2.2,"stroke-linejoin":"round","stroke-linecap":"round"}));
+  st.forEach((s,i)=>{
+    svg.appendChild(el("circle",{cx:X(i),cy:Y(s.avg),r:3.6,fill:c1,stroke:cssv("--surface"),"stroke-width":2}));
+    const h=el("circle",{cx:X(i),cy:Y(s.avg),r:14,fill:"transparent"});
+    h.addEventListener("mousemove",e=>tip(`<b>${s.m}</b><br>평균 ${won(Math.round(s.avg))}<br>최고 ${won(s.max)} · 최저 ${won(s.min)}<br>${s.n}건`,e.clientX,e.clientY));
+    h.addEventListener("mouseleave",untip);
+    svg.appendChild(h);
+  });
+  const last=st[st.length-1];
+  svg.appendChild(el("circle",{cx:X(st.length-1),cy:Y(last.avg),r:6,fill:"none",stroke:cssv("--glow"),"stroke-width":2,opacity:.9}));
+  const step=Math.ceil(st.length/(W<520?5:7));
+  st.forEach((s,i)=>{ if(i%step===0||i===st.length-1)
+    svg.appendChild(el("text",{x:X(i),y:H-6,"text-anchor":"middle","font-size":"10"},s.m.slice(2).replace("-","."))); });
+  const pk=st.reduce((a,b)=>b.max>a.max?b:a), pi=st.indexOf(pk);
+  svg.appendChild(el("text",{x:clamp(X(pi),pL+26,W-pR-26),y:Y(pk.max)-7,"text-anchor":"middle",class:"val"},"최고 "+won(pk.max)));
+
+  const sv=$("#cVol"), VH=70; reset(sv,W,VH);
+  const vmax=Math.max(...st.map(s=>s.n)), bw=Math.max(3,(W-pL-pR)/st.length-3);
+  st.forEach((s,i)=>{
+    const h=Math.max(2,(VH-20)*(s.n/vmax)), r=el("rect",{x:X(i)-bw/2,y:VH-18-h,width:bw,height:h,rx:3,fill:cssv("--line-2")});
+    r.addEventListener("mousemove",e=>tip(`<b>${s.m}</b><br>${s.n}건`,e.clientX,e.clientY));
+    r.addEventListener("mouseleave",untip); sv.appendChild(r);
+    if(i%step===0||i===st.length-1) sv.appendChild(el("text",{x:X(i),y:VH-4,"text-anchor":"middle","font-size":"10"},s.n));
+  });
+}
+
+/* ═══ 타입 테이블 ═══ */
+function renderTypes(){
+  const d=S.data, tb=$("#typeTable tbody"), tf=$("#typeTable tfoot");
+  if(!tb) return;
+  const tot=d.types.reduce((s,t)=>s+t.units,0);
+  const cl=py=>py===31?"t1":py===36?"t2":"t3";
+  tb.innerHTML=d.types.map(t=>`<tr>
+    <td><b>${t.name}</b></td>
+    <td><span class="tag ${cl(t.py)}">${t.py}평</span></td>
+    <td class="n opt">${t.supply}</td>
+    <td class="n">${t.exclusive.toFixed(2)}</td>
+    <td class="n">${t.units.toLocaleString()}</td>
+    <td class="n opt">${(t.units/tot*100).toFixed(1)}%</td>
+    <td class="n opt">${t.rooms}</td>
+    <td class="n">${t.sale||"—"}</td>
+    <td class="n opt">${t.rent||"—"}</td></tr>`).join("");
+  tf.innerHTML=`<tr><td>합계</td><td></td><td class="opt"></td><td></td>
+    <td class="n">${tot.toLocaleString()}</td><td class="n opt">100%</td><td class="opt"></td>
+    <td class="n">${d.types.reduce((s,t)=>s+t.sale,0)}</td>
+    <td class="n opt">${d.types.reduce((s,t)=>s+t.rent,0)}</td></tr>`;
+  $("#typeNote").textContent=`세대수·매물 KB부동산 ${d.kb.asOf} · 전용면적은 네이버 표기(72·84·95㎡) 기준 추정`;
+  $("#quoteNote").textContent="리치고 시세 2026-08-26";
+}
+
+/* ═══ 실거래 테이블 ═══ */
+function renderTx(){
+  const wrap=$("#txWrap"); if(!wrap) return;
+  const {deal,py,q,sort,dir}=S.tx;
+  let rows=[...S.data.transactions];
+  if(deal!=="all") rows=rows.filter(r=>r.deal===deal);
+  if(py!=="all") rows=rows.filter(r=>String(r.py)===py);
+  if(q) rows=rows.filter(r=>[r.date,r.floor,r.amount,r.area].join(" ").includes(q));
+  const best={};
+  [...S.data.transactions].sort((a,b)=>a.date.localeCompare(b.date)).forEach(t=>{
+    const k=t.deal+t.py;
+    if(best[k]==null||t.amount>best[k]){ t._hi=best[k]!=null; best[k]=t.amount; } else t._hi=false;
+  });
+  const key={date:r=>r.date,amount:r=>r.amount,floor:r=>r.floor,area:r=>r.area,deal:r=>r.deal}[sort]||(r=>r.date);
+  rows.sort((a,b)=>{const A=key(a),B=key(b); return (A>B?1:A<B?-1:0)*dir;});
+  if(!rows.length){
+    wrap.innerHTML=`<div class="empty"><strong>표시할 거래가 없습니다</strong>필터를 바꾸거나 데이터를 연결해 주세요.</div>`;
+    return;
+  }
+  const total=rows.length, shown=Math.min(S.tx.limit,total), view=rows.slice(0,shown);
+  const hasDong=S.data.transactions.some(t=>t.dong);
+  const th=(k,l,c="")=>`<th class="so ${c} ${sort===k?(dir>0?"asc":"desc"):""}" data-k="${k}">${l}</th>`;
+  wrap.innerHTML=`<table><thead><tr>
+    ${th("date","계약일")}${th("deal","구분")}${th("area","전용","opt")}<th>평형</th>${hasDong?'<th class="opt">동</th>':""}${th("floor","층")}${th("amount","금액")}<th class="opt">평당</th>
+  </tr></thead><tbody>${view.map(r=>`<tr>
+    <td class="n">${r.date}${r._hi?' <span class="tag hi">신고가</span>':""}</td>
+    <td>${r.deal}</td>
+    <td class="n opt">${r.area}</td>
+    <td><span class="tag ${r.py===31?"t1":r.py===36?"t2":"t3"}">${r.py}평</span></td>
+    ${hasDong?`<td class="n opt">${esc(r.dong||"—")}</td>`:""}
+    <td class="n">${r.floor}</td>
+    <td class="n"><b>${won(r.amount)}</b></td>
+    <td class="n opt">${Math.round(r.amount/(r.area/3.3058)).toLocaleString()}만</td>
+  </tr>`).join("")}</tbody></table>
+  <div style="display:flex; align-items:center; gap:10px; padding:12px 16px; font-size:12px; color:var(--muted)">
+    <span>${total.toLocaleString()}건 중 ${shown.toLocaleString()}건</span>
+    ${shown<total?`<button class="btn sm" id="txMore">더 보기</button><button class="btn sm" id="txAll">전체</button>`:""}
+  </div>`;
+  $$("#txWrap th.so").forEach(t=>t.addEventListener("click",()=>{
+    const k=t.dataset.k;
+    if(S.tx.sort===k) S.tx.dir*=-1; else { S.tx.sort=k; S.tx.dir=-1; }
+    renderTx();
+  }));
+  $("#txMore")?.addEventListener("click",()=>{ S.tx.limit+=200; renderTx(); });
+  $("#txAll")?.addEventListener("click",()=>{ S.tx.limit=1e6; renderTx(); });
+}
+
+/* ═══ 매물 ═══════════════════════════════════════════
+   네이버 부동산 매물 목록(.xlsx/.csv/붙여넣기)을 읽어
+   동일매물(중개소 중복 게시)을 하나로 묶어 분석한다.       */
+function loadLocal(){
+  const l=safe(()=>localStorage.getItem("ghd-listings"),null);
+  if(l) try{ const j=JSON.parse(l); if(Array.isArray(j)&&j.length){ S.data.listings=j; S.lsSeeded=false; } }catch(e){}
+  const m=safe(()=>localStorage.getItem("ghd-lsmeta"),null);
+  if(m) try{ S.lsMeta=JSON.parse(m); }catch(e){}
+  const f=safe(()=>localStorage.getItem("ghd-favs"),null);
+  if(f) try{ S.favs=new Set(JSON.parse(f)); }catch(e){}
+}
+const saveL=()=>{ safe(()=>localStorage.setItem("ghd-listings",JSON.stringify(S.data.listings)));
+                  safe(()=>localStorage.setItem("ghd-lsmeta",JSON.stringify(S.lsMeta))); };
+const saveF=()=>safe(()=>localStorage.setItem("ghd-favs",JSON.stringify([...S.favs])));
+
+/* ── 최소 XLSX 리더 (ZIP + DecompressionStream, 외부 라이브러리 없음) ── */
+async function readXlsx(buf){
+  if(typeof DecompressionStream!=="function")
+    throw new Error("이 브라우저는 엑셀 해제를 지원하지 않습니다. 엑셀에서 CSV로 저장해 올려주세요.");
+  const dv=new DataView(buf), u8=new Uint8Array(buf);
+  let eo=-1;
+  for(let i=u8.length-22; i>=Math.max(0,u8.length-66000); i--)
+    if(dv.getUint32(i,true)===0x06054b50){ eo=i; break; }
+  if(eo<0) throw new Error("xlsx 파일 구조를 읽지 못했습니다.");
+  let n=dv.getUint16(eo+10,true), off=dv.getUint32(eo+16,true);
+  const files={};
+  for(let i=0;i<n;i++){
+    if(dv.getUint32(off,true)!==0x02014b50) break;
+    const method=dv.getUint16(off+10,true), csize=dv.getUint32(off+20,true);
+    const nl=dv.getUint16(off+28,true), el=dv.getUint16(off+30,true), cl=dv.getUint16(off+32,true);
+    const lho=dv.getUint32(off+42,true);
+    const name=new TextDecoder().decode(u8.subarray(off+46,off+46+nl));
+    files[name]={method,csize,lho};
+    off+=46+nl+el+cl;
+  }
+  async function read(name){
+    const f=files[name]; if(!f) return null;
+    const lnl=dv.getUint16(f.lho+26,true), lel=dv.getUint16(f.lho+28,true);
+    const start=f.lho+30+lnl+lel, raw=u8.subarray(start,start+f.csize);
+    if(f.method===0) return new TextDecoder().decode(raw);
+    const ds=new DecompressionStream("deflate-raw");
+    const out=new Response(new Blob([raw]).stream().pipeThrough(ds));
+    return new TextDecoder().decode(await out.arrayBuffer());
+  }
+  const unesc=x=>x.replace(/&lt;/g,"<").replace(/&gt;/g,">").replace(/&quot;/g,'"')
+                  .replace(/&#39;/g,"'").replace(/&apos;/g,"'").replace(/&amp;/g,"&");
+  const ssXml=await read("xl/sharedStrings.xml");
+  const shared=[];
+  if(ssXml) for(const si of ssXml.match(/<si>[\s\S]*?<\/si>/g)||[]){
+    let t=""; for(const m of si.match(/<t[^>]*>([\s\S]*?)<\/t>/g)||[])
+      t+=unesc(m.replace(/<t[^>]*>/,"").replace(/<\/t>/,""));
+    shared.push(t);
+  }
+  const sheetName=Object.keys(files).find(k=>/^xl\/worksheets\/sheet\d*\.xml$/.test(k));
+  const xml=await read(sheetName); if(!xml) throw new Error("시트를 찾지 못했습니다.");
+  const col=r=>{ let c=0; for(const ch of r.replace(/\d+/g,"")) c=c*26+(ch.charCodeAt(0)-64); return c-1; };
+  const rows=[];
+  for(const rowXml of xml.match(/<row[\s\S]*?<\/row>/g)||[]){
+    const cells=[];
+    for(const cx of rowXml.match(/<c[\s\S]*?(?:\/>|<\/c>)/g)||[]){
+      const ref=(cx.match(/r="([A-Z]+\d+)"/)||[])[1]; if(!ref) continue;
+      const type=(cx.match(/t="([^"]+)"/)||[])[1];
+      let v="";
+      if(type==="inlineStr"){ const m=cx.match(/<t[^>]*>([\s\S]*?)<\/t>/); v=m?unesc(m[1]):""; }
+      else{ const m=cx.match(/<v[^>]*>([\s\S]*?)<\/v>/);
+        if(m) v = type==="s" ? (shared[+m[1]]??"") : unesc(m[1]); }
+      cells[col(ref)]=v;
+    }
+    rows.push(Array.from(cells,x=>x==null?"":x));
+  }
+  return rows;
+}
+function splitDelimited(text){
+  const lines=text.replace(/\r\n?/g,"\n").split("\n").filter(l=>l.trim());
+  const tab=lines[0].includes("\t");
+  return lines.map(l=> tab ? l.split("\t")
+    : (l.match(/("([^"]|"")*"|[^,]*)(,|$)/g)||[]).map(c=>c.replace(/,$/,"").replace(/^"|"$/g,"").replace(/""/g,'"')));
+}
+
+/* ── 행 → 매물 묶음 ── */
+const HEAD_MAP={ "동":"dong","매/전":"deal","가격":"price","면적":"area","층":"floor",
+                 "향":"face","정보":"info","중개소":"agent","에이전트":"provider","등록일자":"date" };
+function money(s){
+  const m=String(s).trim().match(/^\s*(?:(\d+)\s*억)?\s*([\d,]+)?\s*$/);
+  if(!m||(!m[1]&&!m[2])) return null;
+  return (m[1]?+m[1]*10000:0)+(m[2]?parseInt(m[2].replace(/,/g,""),10):0);
+}
+function parsePrice(txt, deal){
+  const t=String(txt).trim();
+  if(t.includes("~")){ const [a,b]=t.split("~"); return {price:money(a), max:money(b), rent:0}; }
+  if(deal==="월세" && t.includes("/")){
+    const [a,b]=t.split("/");
+    return {price:money(a), max:null, rent:parseInt(String(b).replace(/[^\d]/g,""),10)||0};
+  }
+  return {price:money(t), max:null, rent:0};
+}
+function parseListingRows(rows){
+  if(!rows.length) throw new Error("빈 파일입니다.");
+  let hi=rows.findIndex(r=>r.some(c=>/^(매\/전|가격)$/.test(String(c).trim())));
+  if(hi<0) throw new Error("머리글에서 ‘가격’·‘매/전’ 열을 찾지 못했습니다.");
+  const head=rows[hi].map(c=>String(c).trim());
+  const ix={}; head.forEach((h,i)=>{ if(HEAD_MAP[h]!=null) ix[HEAD_MAP[h]]=i; });
+  if(ix.price==null||ix.deal==null) throw new Error("‘가격’ 또는 ‘매/전’ 열이 없습니다.");
+  const g=(r,k)=> ix[k]==null? "" : String(r[ix[k]]??"").replace(/↳/g,"").trim();
+  const known=S.data.types.reduce((m,t)=>(m[t.name]=t,m),{});
+  const out=[]; let cur=null, n=0;
+  for(let i=hi+1;i<rows.length;i++){
+    const r=rows[i]; if(!r||!r.length) continue;
+    const first=String(r[ix.dong!=null?ix.dong:0]??"");
+    const child=first.trim().startsWith("↳");
+    const deal=g(r,"deal"), priceTxt=g(r,"price");
+    if(!child){
+      if(!deal||!priceTxt) continue;
+      const p=parsePrice(priceTxt,deal); if(p.price==null) continue;
+      const am=g(r,"area").match(/^([\w\-]+)\s*\/\s*([\d.]+)/);
+      const type=am?am[1]:"", area=am?+am[2]:0;
+      const fx=g(r,"floor"); let floor=null, band="";
+      const fm=fx.match(/^(\d+)\s*\//);
+      if(fm){ floor=+fm[1]; band = floor>=34?"고" : floor>=17?"중" : "저"; }
+      else { band=(fx.match(/^(고|중|저)/)||[""])[0]; }
+      cur={ id:"L"+String(++n).padStart(3,"0"), dong:g(r,"dong").replace(/[^\d]/g,""),
+            deal, priceText:priceTxt, price:p.price, priceMax:p.max, rent:p.rent,
+            type, area, py: known[type]? known[type].py : (area? pyOf(area) : 0),
+            floor, band, face:g(r,"face"), listed:g(r,"date"), agents:[] };
+      out.push(cur);
+    } else if(cur){
+      cur.agents.push({ name:g(r,"agent"), memo:g(r,"info"), date:g(r,"date"), provider:g(r,"provider") });
+    }
+  }
+  if(!out.length) throw new Error("읽어낸 매물이 없습니다. 파일 형식을 확인해 주세요.");
+  out.forEach(l=>{
+    const ds=l.agents.map(a=>a.date).filter(Boolean);
+    l.first=ds.length? ds.reduce((a,b)=>a<b?a:b) : l.listed;
+    l.last =ds.length? ds.reduce((a,b)=>a>b?a:b) : l.listed;
+    l.count=l.agents.length||1;
+  });
+  return out;
+}
+async function ingestListings(file){
+  const msg=$("#lsMsg");
+  try{
+    let rows;
+    if(/\.xlsx$/i.test(file.name)) rows=await readXlsx(await file.arrayBuffer());
+    else rows=splitDelimited(await file.text());
+    applyListings(parseListingRows(rows), file.name);
+  }catch(e){ msg.innerHTML=`<div class="callout crit">읽지 못했습니다 — ${esc(e.message)}</div>`; }
+}
+function applyListings(list, label){
+  S.data.listings=list;
+  S.lsMeta={ updated:new Date().toISOString().slice(0,10), source:"네이버 부동산", file:label||"" };
+  S.lsSeeded=false;
+  saveL();
+  $("#lsMsg").innerHTML=`<div class="callout ok">${esc(label||"붙여넣기")} — 고유 매물 <b>${list.length}건</b>,
+    중개소 게시 ${list.reduce((s,l)=>s+l.count,0)}건을 읽었습니다.</div>`;
+  S.lsKw=null; refreshListingUi();
+}
+function refreshListingUi(){ stampListings(); fillListingFilters(); renderListings(); drawListingCharts(); renderHero(); renderOverview(); }
+
+function stampListings(){
+  const e=$("#lsStamp"); if(!e) return;
+  e.textContent = S.lsMeta.updated ? `${S.lsMeta.source||"네이버 부동산"} · ${S.lsMeta.updated} 기준` : "";
+}
+
+/* ── 통계 헬퍼 ── */
+const median=a=>{ if(!a.length) return null; const s=[...a].sort((x,y)=>x-y), m=s.length>>1;
+  return s.length%2? s[m] : Math.round((s[m-1]+s[m])/2); };
+const sales=()=>S.data.listings.filter(l=>l.deal==="매매");
+function daysAgo(d){ // "26.09.01" → Date
+  const m=String(d).match(/(\d{2})\.(\d{2})\.(\d{2})/); if(!m) return null;
+  return new Date(2000+ +m[1], +m[2]-1, +m[3]);
+}
+
+/* ── KPI + 실거래 갭 ── */
+function renderListingStats(){
+  const box=$("#lsStats"); if(!box) return;
+  const all=S.data.listings, sa=sales(), px=sa.map(l=>l.price);
+  if(!all.length){
+    box.innerHTML=`<div class="stat" style="grid-column:1/-1"><span class="k">매물 데이터</span>
+      <span class="v" style="font-size:15px">아직 없습니다</span>
+      <span class="s">아래에서 네이버 부동산 매물 파일을 올리면 분석이 채워집니다.</span></div>`;
+    $("#lsGap").innerHTML=""; return;
+  }
+  const postings=all.reduce((s,l)=>s+l.count,0);
+  const cut=new Date(); cut.setDate(cut.getDate()-7);
+  const fresh=all.filter(l=>{ const d=daysAgo(l.first); return d&&d>=cut; }).length;
+  const med=median(px);
+  box.innerHTML=[
+    {k:"고유 매물", v:all.length+"<small>건</small>", s:`중개소 게시 ${postings}건 · 물건당 ${(postings/all.length).toFixed(1)}곳`},
+    {k:"매매 최저 호가", v:px.length?won(Math.min(...px)):"—", s:`매매 ${sa.length}건 중 최저`},
+    {k:"매매 중위 호가", v:med!=null?won(med):"—", s:px.length?`최고 ${won(Math.max(...px))}`:""},
+    {k:"최근 7일 신규", v:fresh+"<small>건</small>", s:S.lsMeta.updated? "기준 "+S.lsMeta.updated : ""}
+  ].map(c=>`<div class="stat"><span class="k">${c.k}</span><span class="v">${c.v}</span><span class="s">${c.s}</span></div>`).join("");
+
+  // 호가 vs 실거래
+  const tx=S.data.transactions.filter(t=>t.deal==="매매").sort((a,b)=>b.date.localeCompare(a.date)).slice(0,6);
+  const gapBox=$("#lsGap");
+  if(tx.length && med!=null){
+    const avg=Math.round(tx.reduce((s,t)=>s+t.amount,0)/tx.length);
+    const diff=(med-avg)/avg*100;
+    gapBox.innerHTML=`<div class="callout ${diff>12?"crit":diff>0?"":"ok"}">
+      중위 호가 <b>${won(med)}</b>가 최근 매매 실거래 평균 <b>${won(avg)}</b>(${tx.length}건)보다
+      <b>${diff>=0?"+":""}${diff.toFixed(1)}%</b> ${diff>=0?"높습니다":"낮습니다"}.
+      호가는 희망가일 뿐이라 실제 체결가와는 벌어질 수 있고, 토지거래허가구역에서는 실거주 매수만 가능해 협상 여지가 큽니다.</div>`;
+  } else gapBox.innerHTML="";
+}
+
+/* ── 차트 ── */
+function chartDist(){
+  const svg=$("#cDist"); if(!svg) return;
+  const sa=sales();
+  if(!sa.length){ reset(svg,300,40); $("#distNote").textContent=""; return; }
+  const groups={};
+  sa.forEach(l=>{ (groups[l.type||"기타"]=groups[l.type||"기타"]||[]).push(l); });
+  const keys=Object.keys(groups).sort((a,b)=>{
+    const pa=groups[a][0].py, pb=groups[b][0].py; return pa-pb || a.localeCompare(b); });
+  const W=wOf(svg,520), padL=64, padR=24, rowH=42, H=keys.length*rowH+30;
+  reset(svg,W,H);
+  const all=sa.map(l=>l.price), lo=Math.min(...all)*0.97, hi=Math.max(...all)*1.03;
+  const X=v=>padL+(W-padL-padR)*((v-lo)/(hi-lo||1));
+  const C={31:cssv("--s1"),36:cssv("--s2"),41:cssv("--s3")};
+  for(let g=0;g<=4;g++){
+    const v=lo+(hi-lo)*g/4;
+    svg.appendChild(el("line",{x1:X(v),y1:8,x2:X(v),y2:H-22,class:"grid","stroke-dasharray":"2 4"}));
+    svg.appendChild(el("text",{x:X(v),y:H-8,"text-anchor":"middle","font-size":"10",class:"num"},(v/10000).toFixed(1)+"억"));
+  }
+  // 최근 실거래 평균 참조선
+  const tx=S.data.transactions.filter(t=>t.deal==="매매").sort((a,b)=>b.date.localeCompare(a.date)).slice(0,6);
+  if(tx.length){
+    const avg=tx.reduce((s,t)=>s+t.amount,0)/tx.length;
+    if(avg>lo&&avg<hi){
+      svg.appendChild(el("line",{x1:X(avg),y1:4,x2:X(avg),y2:H-22,stroke:cssv("--crit"),"stroke-width":1.5,"stroke-dasharray":"4 3",opacity:.8}));
+      svg.appendChild(el("text",{x:X(avg),y:H-24,"text-anchor":"middle","font-size":"9.5",fill:cssv("--crit"),"font-weight":"600"},"실거래 평균"));
+    }
+  }
+  keys.forEach((k,i)=>{
+    const g=groups[k], y=i*rowH+22, c=C[g[0].py]||cssv("--ink-2");
+    svg.appendChild(el("text",{x:0,y:y+4,class:"cat","font-size":"11.5"},k));
+    svg.appendChild(el("text",{x:0,y:y+16,"font-size":"9.5"},g.length+"건"));
+    const m=median(g.map(l=>l.price));
+    svg.appendChild(el("line",{x1:X(m),y1:y-11,x2:X(m),y2:y+11,stroke:cssv("--ink-2"),"stroke-width":2,"stroke-linecap":"round"}));
+    const seen={};
+    g.forEach(l=>{
+      const x=Math.round(X(l.price)); seen[x]=(seen[x]||0);
+      const dy=(seen[x]%2? 1:-1)*Math.ceil(seen[x]/2)*8; seen[x]++;
+      const dot=el("circle",{cx:X(l.price),cy:y+dy,r:5,fill:c,stroke:cssv("--surface"),"stroke-width":1.5,opacity:.92});
+      dot.addEventListener("mousemove",e=>tip(
+        `<b>${won(l.price)}</b>${l.priceMax?` ~ ${won(l.priceMax)}`:""}<br>${l.dong}동 · ${l.band}층 · ${l.face}<br>중개소 ${l.count}곳`,
+        e.clientX,e.clientY));
+      dot.addEventListener("mouseleave",untip);
+      svg.appendChild(dot);
+    });
+  });
+  $("#distNote").textContent=`매매 ${sa.length}건 · 점 하나 = 물건 하나`;
+}
+function chartBand(){
+  const svg=$("#cBand"); if(!svg) return;
+  const sa=sales(), bands=["고","중","저"];
+  const rows=bands.map(b=>({b, v:sa.filter(l=>l.band===b)})).filter(r=>r.v.length);
+  if(!rows.length){ reset(svg,300,10); return; }
+  const W=wOf(svg,360), padL=44, padR=64, rowH=30, H=rows.length*rowH+6;
+  reset(svg,W,H);
+  const max=Math.max(...rows.map(r=>median(r.v.map(l=>l.price))))*1.08;
+  const X=v=>padL+(W-padL-padR)*(v/max);
+  rows.forEach((r,i)=>{
+    const y=i*rowH+6, m=median(r.v.map(l=>l.price));
+    svg.appendChild(el("text",{x:0,y:y+13,class:"cat","font-size":"11.5"},r.b+"층"));
+    const w=Math.max(X(m)-padL,3);
+    svg.appendChild(el("rect",{x:padL,y,width:w,height:17,rx:4,fill:cssv("--s1"),opacity:r.b==="고"?1:r.b==="중"?.75:.55}));
+    svg.appendChild(el("text",{x:padL+w+7,y:y+13,class:"val"},won(m)+` (${r.v.length})`));
+  });
+}
+function chartDong(){
+  const svg=$("#cDong"); if(!svg) return;
+  const all=S.data.listings;
+  const map={}; all.forEach(l=>{ if(l.dong) map[l.dong]=(map[l.dong]||0)+1; });
+  const keys=Object.keys(map).sort();
+  if(!keys.length){ reset(svg,300,10); return; }
+  const W=wOf(svg,360), padL=44, padR=58, rowH=26, H=keys.length*rowH+6;
+  reset(svg,W,H);
+  const max=Math.max(...keys.map(k=>map[k]))*1.1, X=v=>padL+(W-padL-padR)*(v/max);
+  keys.forEach((k,i)=>{
+    const y=i*rowH+5;
+    svg.appendChild(el("text",{x:0,y:y+12,class:"cat","font-size":"11.5"},k+"동"));
+    const w=Math.max(X(map[k])-padL,3);
+    svg.appendChild(el("rect",{x:padL,y,width:w,height:15,rx:4,fill:cssv("--line-2")}));
+    svg.appendChild(el("text",{x:padL+w+7,y:y+12,class:"val"},map[k]+"건"));
+  });
+}
+function chartPost(){
+  const svg=$("#cPost"); if(!svg) return;
+  const cnt={};
+  S.data.listings.forEach(l=>l.agents.forEach(a=>{ if(a.date) cnt[a.date]=(cnt[a.date]||0)+1; }));
+  const keys=Object.keys(cnt).sort();
+  if(keys.length<2){ svg.parentElement.innerHTML=`<div class="empty"><strong>게시 이력이 부족합니다</strong>매물 파일을 올리면 일자별 추이가 채워집니다.</div>`; return; }
+  const W=wOf(svg,700), H=110, padL=26, padR=12, padB=22;
+  reset(svg,W,H);
+  const max=Math.max(...keys.map(k=>cnt[k]));
+  const bw=Math.max(4,(W-padL-padR)/keys.length-3);
+  const X=i=>padL+(W-padL-padR)*(keys.length===1?.5:i/(keys.length-1));
+  keys.forEach((k,i)=>{
+    const h=Math.max(2,(H-padB-8)*(cnt[k]/max));
+    const r=el("rect",{x:X(i)-bw/2,y:H-padB-h,width:bw,height:h,rx:3,fill:cssv("--s1"),opacity:.85});
+    r.addEventListener("mousemove",e=>tip(`<b>${k}</b><br>게시 ${cnt[k]}건`,e.clientX,e.clientY));
+    r.addEventListener("mouseleave",untip);
+    svg.appendChild(r);
+  });
+  const step=Math.ceil(keys.length/(W<520?4:8));
+  keys.forEach((k,i)=>{ if(i%step===0||i===keys.length-1)
+    svg.appendChild(el("text",{x:X(i),y:H-6,"text-anchor":"middle","font-size":"10"},k.slice(3))); });
+}
+function drawListingCharts(){ renderListingStats(); chartDist(); chartBand(); chartDong(); chartPost(); }
+
+/* ── 필터 · 목록 ── */
+function fillListingFilters(){
+  const types=[...new Set(S.data.listings.map(l=>l.type).filter(Boolean))].sort();
+  const dongs=[...new Set(S.data.listings.map(l=>l.dong).filter(Boolean))].sort();
+  const set=(id,arr,suf)=>{ const s=$("#"+id); if(!s) return; const cur=s.value;
+    s.innerHTML=`<option value="all">전체</option>`+arr.map(v=>`<option>${v}</option>`).join("");
+    if([...s.options].some(o=>o.value===cur)) s.value=cur;
+  };
+  set("lsType",types); set("lsDong",dongs);
+  const $k=$("#lsKeywords"); if(!$k) return;
+  const KW=["올수리","인테리어","입주","시스템에어컨","골프장뷰","조망","채광","주인거주","로얄","급매","인덕션","확장"];
+  const cnt={};
+  S.data.listings.forEach(l=>{
+    const t=l.agents.map(a=>a.memo).join(" ");
+    KW.forEach(k=>{ const key=k==="골프장뷰"?"골프장":k; if(t.includes(key)) cnt[k]=(cnt[k]||0)+1; });
+  });
+  const top=Object.entries(cnt).sort((a,b)=>b[1]-a[1]).slice(0,8);
+  $k.innerHTML = top.length? `<div class="chips">${top.map(([k,v])=>
+    `<button class="chip ${S.lsKw===k?"sel":"flat"}" data-kw="${k}">${k} ${v}</button>`).join("")}
+    ${S.lsKw?`<button class="chip flat" data-kw="">해제</button>`:""}</div>` : "";
+  $$("#lsKeywords [data-kw]").forEach(b=>b.addEventListener("click",()=>{
+    S.lsKw = b.dataset.kw || null; fillListingFilters(); renderListings(); }));
+}
+function renderListings(){
+  const host=$("#lsBody"); if(!host) return;
+  const deal=S.lsDeal||"all", type=$("#lsType")?.value||"all", dong=$("#lsDong")?.value||"all",
+        band=$("#lsBand")?.value||"all", sort=$("#lsSort")?.value||"price-asc",
+        favOnly=$("#lsFav")?.checked;
+  let rows=S.data.listings.filter(l=>
+    (deal==="all"||l.deal===deal)&&(type==="all"||l.type===type)&&
+    (dong==="all"||l.dong===dong)&&(band==="all"||l.band===band)&&
+    (!favOnly||S.favs.has(l.id))&&
+    (!S.lsKw||l.agents.some(a=>a.memo.includes(S.lsKw==="골프장뷰"?"골프장":S.lsKw))));
+  const cmp={ "price-asc":(a,b)=>a.price-b.price, "price-desc":(a,b)=>b.price-a.price,
+    "count-desc":(a,b)=>b.count-a.count, "new-desc":(a,b)=>(b.last||"").localeCompare(a.last||"") };
+  rows.sort(cmp[sort]);
+  if(!rows.length){
+    host.innerHTML=`<div class="empty"><strong>${S.data.listings.length?"조건에 맞는 매물이 없습니다":"등록된 매물이 없습니다"}</strong>
+      ${S.data.listings.length?"필터를 조정해 보세요.":"아래에서 네이버 부동산 매물 파일을 올려주세요."}</div>`;
+    return;
+  }
+  const cl=py=>py===31?"t1":py===36?"t2":"t3";
+  host.innerHTML=`<div class="lsList">${rows.map(l=>`
+    <div class="lrow" data-id="${l.id}">
+      <button class="lhead" aria-expanded="false">
+        <span class="lprice">${won(l.price)}${l.priceMax?`<em>~${won(l.priceMax)}</em>`:""}${l.rent?`<em>/${l.rent}만</em>`:""}</span>
+        <span class="tag ${cl(l.py)}">${l.py}평</span>
+        <span class="lmeta">${l.deal} · ${esc(l.type)} · ${l.dong}동 · ${l.floor?l.floor+"층":l.band+"층"} · ${esc(l.face)}</span>
+        <span class="lcnt" title="이 물건을 올린 중개소 수">${l.agents.length?`중개소 ${l.agents.length}`:"단독"}</span>
+        <span class="lstar ${S.favs.has(l.id)?"on":""}" data-fav="${l.id}">${S.favs.has(l.id)?"★":"☆"}</span>
+        <span class="lchev">›</span>
+      </button>
+      <div class="lbody" hidden>
+        <div class="lmini">최초 게시 ${l.first} · 최근 ${l.last} · 전용 ${l.area}㎡</div>
+        ${l.agents.length?l.agents.map(a=>`<div class="lag">
+          <span class="an">${esc(a.name||"—")}</span>
+          <span class="am">${esc(a.memo||"")}</span>
+          <span class="ad num">${esc(a.date||"")}</span></div>`).join("")
+          :`<div class="lag"><span class="an">묶인 중개소 없음</span><span class="am">단독 게시 매물입니다</span><span class="ad"></span></div>`}
+      </div>
+    </div>`).join("")}</div>
+    <div style="padding:10px 16px 14px; font-size:12px; color:var(--muted)">
+      ${rows.length}건 표시 · 중개소 게시 ${rows.reduce((s,l)=>s+l.count,0)}건</div>`;
+  $$(".lhead").forEach(h=>h.addEventListener("click",e=>{
+    if(e.target.dataset.fav){ const id=e.target.dataset.fav;
+      S.favs.has(id)?S.favs.delete(id):S.favs.add(id); saveF(); renderListings(); return; }
+    const body=h.nextElementSibling, open=!body.hidden;
+    body.hidden=open; h.setAttribute("aria-expanded",String(!open));
+    h.closest(".lrow").classList.toggle("open",!open);
+  }));
+}
+
+/* ═══ 다운로드 ═══ */
+const DL=(typeof claude!=="undefined"&&claude&&typeof claude.use==="function")
+  ? claude.use("downloads").catch(()=>null) : Promise.resolve(null);
+async function download(name,text,mime){
+  const body="﻿"+text, cap=await DL;
+  if(cap){
+    try{ await cap.save({filename:name,data:body}); return; }
+    catch(err){
+      const c=err&&err.code;
+      if(c==="rejected_extension"||c==="extension_not_enabled"){
+        try{ await cap.save({filename:name.replace(/\.[^.]+$/,".txt"),data:body}); return; }catch(e){}
+      }
+      if(c==="declined"||c==="rate_limited") return;
+    }
+  }
+  const b=new Blob([body],{type:mime+";charset=utf-8"}), a=document.createElement("a");
+  a.href=URL.createObjectURL(b); a.download=name;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+}
+
+/* ═══ 계산기 ═══ */
+function acqTax(e,houses,area){
+  const farm=area>85;
+  if(houses>=3) return {base:12,edu:.4,farm:farm?1.0:0,label:"3주택 이상·조정지역 중과"};
+  if(houses===2) return {base:8,edu:.4,farm:farm?.6:0,label:"2주택·조정지역 중과"};
+  let base = e<=6?1 : e<=9? +(e*(2/3)-3).toFixed(4) : 3;
+  return {base,edu:+(base*.1).toFixed(4),farm:farm?.2:0,label:"1주택 표준세율"};
+}
+function brokerRate(e){ return e<0.5?.6 : e<2?.5 : e<9?.4 : e<12?.5 : e<15?.6 : .7; }
+function propTax(e){
+  const pub=e*1e8*.69, base=pub*.6;
+  let t = base<=6e7? base*.001
+        : base<=1.5e8? 6e4+(base-6e7)*.0015
+        : base<=3e8? 195000+(base-1.5e8)*.0025
+        : 570000+(base-3e8)*.004;
+  return {pub,total:t+base*.0014+t*.2};
+}
+function renderSim(){
+  if(!$("#f_price")) return;
+  const g=id=>parseFloat($("#"+id).value)||0;
+  const price=g("f_price"),area=g("f_area"),houses=+$("#f_houses").value,mode=$("#f_mode").value,
+        ltv=g("f_ltv"),cap=g("f_cap"),rate=g("f_rate"),jeonse=g("f_jeonse"),
+        regFee=g("f_reg"),years=Math.max(1,g("f_years")),growth=g("f_growth");
+  $("#w_ltv").style.display=$("#w_cap").style.display=$("#w_rate").style.display=mode==="loan"?"":"none";
+  $("#w_jeonse").style.display=mode==="gap"?"":"none";
+  const tx=acqTax(price,houses,area), tr=tx.base+tx.edu+tx.farm;
+  const acq=price*1e8*tr/100, br=brokerRate(price), brk=price*1e8*br/100, reg=price*1e8*regFee/100;
+  const loan=mode==="loan"? Math.min(price*ltv/100,cap)*1e8 : 0;
+  const dep=mode==="gap"? jeonse*1e8 : 0;
+  const own=price*1e8-loan-dep+acq+brk+reg;
+
+  $("#simAlert").innerHTML = mode==="gap"
+    ? `<div class="callout crit"><b>지금은 불가능한 시나리오입니다.</b> 2026.07.05~2027.12.31 기흥구 아파트는 실거주 목적에만 허가가 납니다. 전세 낀 매수는 허가 대상이 아니고 무허가 계약은 무효입니다. 아래는 규제 해제 이후를 가정한 참고치입니다.</div>`
+    : mode==="loan"
+    ? `<div class="callout">규제지역 LTV <b>40%</b> 적용. 한도 상한값(${cap}억)은 정책에 따라 바뀌므로 실행 전 금융기관 확인이 필요하고, DSR 40%가 별도로 걸립니다.</div>`
+    : "";
+
+  const rows=[["매매가",price*1e8],
+    [`취득세 등 <span class="sub">${tx.label} · ${tr.toFixed(2)}%</span>`,acq],
+    [`중개보수 <span class="sub">상한 ${br}%</span>`,brk],
+    [`등기·법무 <span class="sub">${regFee}%</span>`,reg]];
+  if(loan) rows.push([`주택담보대출 <span class="sub">LTV ${ltv}% · 상한 ${cap}억</span>`,-loan]);
+  if(dep) rows.push(["전세보증금 승계",-dep]);
+  $("#simCost").innerHTML=rows.map(([l,v])=>`<div class="rw"><span class="lb">${l}</span><span class="vl">${v<0?"−":""}${won(Math.round(Math.abs(v)/1e4))}</span></div>`).join("")
+    +`<div class="rw tot"><span class="lb">실투자금</span><span class="vl">${won(Math.round(own/1e4))}</span></div>`;
+
+  const pt=propTax(price), interest=loan*rate/100*years;
+  const future=price*1e8*Math.pow(1+growth/100,years), gain=future-price*1e8;
+  const net=gain-(pt.total*years+interest)-acq-brk-reg;
+  const roi=own>0? net/own*100 : 0;
+  const cagr=own>0&&net>-own? (Math.pow((own+net)/own,1/years)-1)*100 : NaN;
+  $("#simReturn").innerHTML=[
+    [`추정 공시가격 <span class="sub">시세×69%</span>`,won(Math.round(pt.pub/1e4))],
+    [`연 보유세 <span class="sub">재산세+도시지역분+지방교육세</span>`,won(Math.round(pt.total/1e4))],
+    [`${years}년 이자 <span class="sub">${rate}% 단순 누계</span>`,loan?won(Math.round(interest/1e4)):"—"],
+    [`${years}년 후 시세 <span class="sub">연 ${growth}%</span>`,won(Math.round(future/1e4))],
+    ["평가 차익",(gain<0?"−":"")+won(Math.round(Math.abs(gain)/1e4))],
+    [`비용 차감 후 순손익 <span class="sub">양도세 제외</span>`,(net<0?"−":"")+won(Math.round(Math.abs(net)/1e4))]
+  ].map(([l,v])=>`<div class="rw"><span class="lb">${l}</span><span class="vl">${v}</span></div>`).join("")
+   +`<div class="rw tot"><span class="lb">실투자금 대비 수익률</span>
+      <span class="vl" style="color:${net>=0?"var(--good)":"var(--crit)"}">${roi.toFixed(1)}%${isNaN(cagr)?"":` <span class="sub">연 ${cagr.toFixed(1)}%</span>`}</span></div>`;
+}
+
+/* ═══ 지도·타임라인 ═══ */
+function renderMap(){
+  const svg=$("#mapSvg"); if(!svg) return; svg.innerHTML="";
+  const ink=cssv("--ink"),ink2=cssv("--ink-2"),muted=cssv("--muted"),line=cssv("--line-2"),
+        s1=cssv("--s1"),s2=cssv("--s2"),acc=cssv("--accent");
+  [[150,"도보 5분"],[105,"도보 3분"],[60,""]].forEach(([r,lab])=>{
+    svg.appendChild(el("circle",{cx:250,cy:190,r,fill:"none",stroke:line,"stroke-dasharray":"3 5","stroke-width":1,opacity:.8}));
+    if(lab) svg.appendChild(el("text",{x:250,y:190-r-5,"text-anchor":"middle","font-size":"9.5",fill:muted},lab));
+  });
+  svg.appendChild(el("line",{x1:20,y1:150,x2:500,y2:150,stroke:s2,"stroke-width":5,"stroke-linecap":"round",opacity:.85}));
+  svg.appendChild(el("text",{x:26,y:141,"font-size":"10.5",fill:s2,"font-weight":"600"},"수인분당선"));
+  svg.appendChild(el("line",{x1:20,y1:168,x2:500,y2:168,stroke:s1,"stroke-width":4,"stroke-linecap":"round",opacity:.8,"stroke-dasharray":"9 5"}));
+  svg.appendChild(el("text",{x:26,y:184,"font-size":"10.5",fill:s1,"font-weight":"600"},"용인에버라인"));
+  svg.appendChild(el("rect",{x:188,y:136,width:124,height:44,rx:10,fill:cssv("--surface"),stroke:line,"stroke-width":1.5}));
+  svg.appendChild(el("text",{x:250,y:156,"text-anchor":"middle","font-size":"12.5","font-weight":"700",fill:ink},"기흥역"));
+  svg.appendChild(el("text",{x:250,y:171,"text-anchor":"middle","font-size":"9.5",fill:muted},"환승 · K237 / Y110"));
+  svg.appendChild(el("rect",{x:196,y:206,width:108,height:44,rx:10,fill:acc}));
+  svg.appendChild(el("text",{x:250,y:224,"text-anchor":"middle","font-size":"12.5","font-weight":"700",fill:cssv("--accent-ink")},"힐스테이트 기흥"));
+  svg.appendChild(el("text",{x:250,y:239,"text-anchor":"middle","font-size":"10",fill:cssv("--accent-ink"),opacity:.85},"976세대 · 49층"));
+  svg.appendChild(el("line",{x1:250,y1:206,x2:250,y2:180,stroke:acc,"stroke-width":2.5}));
+  svg.appendChild(el("text",{x:258,y:196,"font-size":"9.5",fill:acc,"font-weight":"600"},"2층 통로 직결"));
+  [{x:340,y:198,t:"AK플라자 기흥점",s:"1·2층 직결 · 롯데시네마"},
+   {x:120,y:214,t:"기흥역 더샵",s:"1,394세대"},
+   {x:120,y:262,t:"센트럴·파크 푸르지오",s:"2,488세대"},
+   {x:340,y:258,t:"롯데캐슬 레이시티",s:"663세대"},
+   {x:64,y:104,t:"수원신갈IC",s:"경부고속도로",side:"start"},
+   {x:348,y:104,t:"구성역 (GTX-A)",s:"차량 10분대"}
+  ].forEach(p=>{
+    svg.appendChild(el("circle",{cx:p.x,cy:p.y,r:4,fill:line}));
+    const an=p.side||(p.x>250?"start":"end"), dx=an==="start"?9:-9;
+    svg.appendChild(el("text",{x:p.x+dx,y:p.y+1,"text-anchor":an,"font-size":"11","font-weight":"600",fill:ink2},p.t));
+    svg.appendChild(el("text",{x:p.x+dx,y:p.y+14,"text-anchor":an,"font-size":"9.5",fill:muted},p.s));
+  });
+  svg.appendChild(el("line",{x1:20,y1:352,x2:500,y2:352,stroke:cssv("--line")}));
+  [["강남역","광역버스 7개 노선"],["구성역 GTX-A","서울역 20분대(2028)"],["플랫폼시티","2030 완공 예정"]]
+    .forEach((a,i)=>{ const y=372+i*20;
+      svg.appendChild(el("text",{x:20,y,"font-size":"11","font-weight":"600",fill:ink2},a[0]));
+      svg.appendChild(el("text",{x:130,y,"font-size":"10.5",fill:muted},a[1])); });
+}
+function renderStatic(){
+  $("#timeline").innerHTML=S.data.timeline.map(t=>`<li>
+    <span class="when" ${t.kind==="crit"?'style="color:var(--crit)"':""}>${t.when}</span>
+    <span class="what"><b>${t.title}</b><span>${t.body}</span></span></li>`).join("");
+  $("#sourceList").innerHTML=`<ul>${S.data.sources.map(s=>`<li><a href="${s.u}" target="_blank" rel="noopener">${s.l}</a> — ${s.w}</li>`).join("")}</ul>
+    <p>전용면적은 2026-09-01 네이버 부동산 매물 목록에 표기된 값(104형 72㎡ · 120·121형 84㎡ · 137형 95㎡)을 기준으로 잡았습니다. 소수점까지의 정확한 신고 면적은 국토부 실거래를 연결하면 자동으로 교정됩니다.</p>`;
+  $("#naverLink").href=S.data.complex.naverUrl;
+  $("#naverWhy").innerHTML=`
+    <p>네이버 부동산은 공공데이터포털의 국토부 실거래가와 달리 <b>공식 오픈 API가 없고</b>,
+    이용약관상 자동 수집이 금지되어 있습니다. 내부 엔드포인트를 긁는 방식은 약관 위반이고
+    접속 차단·법적 분쟁 위험이 이용자에게 돌아갑니다. 그래서 매물만 <b>파일 업로드</b>로 갱신합니다.</p>
+    <ul>
+      <li>네이버 부동산에서 단지 매물 목록을 내려받아 <b>매물</b> 탭에 올리면 끝입니다. 엑셀은 브라우저 안에서 바로 해제해 읽습니다(외부 라이브러리 없음).</li>
+      <li><code>↳</code>로 묶인 <b>동일매물</b>을 하나의 물건으로 합쳐, 중개소 중복 게시 때문에 매물 수가 부풀려지는 문제를 없앴습니다.</li>
+      <li>실거래가는 국토부 API로 계속 자동 갱신되므로, 같은 화면에서 <b>호가와 실거래의 차이</b>를 바로 볼 수 있습니다.</li>
+      <li><b>JSON</b> 버튼으로 내보내 <code>data/listings.json</code>에 커밋하면 다른 기기에서도 같은 매물이 보입니다.</li>
+    </ul>`;
+}
+
+/* ═══ 데이터 로딩 ═══ */
+function parseMolitCsv(text){
+  const lines=text.split(/\r?\n/).filter(l=>l.trim());
+  const hi=lines.findIndex(l=>/전용면적/.test(l)&&/(거래금액|보증금)/.test(l));
+  if(hi<0) throw new Error("헤더 행에서 ‘전용면적’과 ‘거래금액’ 열을 찾지 못했습니다.");
+  const sp=l=>l.match(/("[^"]*"|[^,]+)/g)?.map(s=>s.replace(/^"|"$/g,"").trim())||[];
+  const head=sp(lines[hi]), ix=n=>head.findIndex(h=>h.replace(/\s/g,"").includes(n));
+  const iN=ix("단지명"),iA=ix("전용면적"),iY=ix("계약년월"),iD=ix("계약일"),
+        iAmt=ix("거래금액"),iDep=ix("보증금"),iR=ix("월세"),iF=ix("층");
+  const out=[];
+  for(let i=hi+1;i<lines.length;i++){
+    const c=sp(lines[i]); if(c.length<4) continue;
+    if(iN>=0&&c[iN]&&!c[iN].includes("힐스테이트")) continue;
+    const ym=(c[iY]||"").replace(/\D/g,""); if(ym.length<6) continue;
+    const day=String(c[iD]||"1").replace(/\D/g,"").padStart(2,"0");
+    const area=parseFloat(c[iA]); if(!area) continue;
+    let deal="매매",amount=null,rent=0;
+    if(iAmt>=0&&c[iAmt]) amount=parseInt(String(c[iAmt]).replace(/\D/g,""),10);
+    if(iDep>=0&&c[iDep]){ amount=parseInt(String(c[iDep]).replace(/\D/g,""),10);
+      rent=iR>=0?parseInt(String(c[iR]).replace(/\D/g,""),10)||0:0; deal=rent>0?"월세":"전세"; }
+    if(!amount) continue;
+    out.push({date:`${ym.slice(0,4)}-${ym.slice(4,6)}-${day}`,deal,area:+area.toFixed(2),
+      py:pyOf(area),floor:parseInt(c[iF],10)||0,amount,rent,src:"국토부 CSV"});
+  }
+  if(!out.length) throw new Error("힐스테이트 기흥에 해당하는 거래 행이 없습니다.");
+  return out;
+}
+function ingest(rows,label){
+  const seen=new Set(), merged=[];
+  [...rows,...S.data.transactions].forEach(t=>{
+    const k=[t.date,t.deal,t.area,t.floor,t.amount].join("|");
+    if(!seen.has(k)){ seen.add(k); merged.push(t); }
+  });
+  S.data.transactions=merged.sort((a,b)=>b.date.localeCompare(a.date));
+  safe(()=>localStorage.setItem("ghd-tx",JSON.stringify(S.data.transactions)));
+  $("#loadMsg").innerHTML=`<div class="callout ok">${esc(label)} — 거래 <b>${rows.length}건</b>을 읽어 총 ${merged.length}건이 되었습니다.</div>`;
+  setSync(true, merged.length+"건");
+  renderHero(); renderOverview(); renderTrend(); renderTx();
+}
+function handleFile(f){
+  const fr=new FileReader();
+  fr.onload=()=>{ try{
+    const t=String(fr.result);
+    if(/^\s*[[{]/.test(t)){
+      const j=JSON.parse(t), arr=Array.isArray(j)?j:(j.transactions||[]);
+      if(!arr.length) throw new Error("거래 배열을 찾지 못했습니다.");
+      ingest(arr.map(x=>({...x,py:x.py||pyOf(x.area),src:x.src||"JSON"})),f.name);
+    } else ingest(parseMolitCsv(t),f.name);
+  }catch(e){ $("#loadMsg").innerHTML=`<div class="callout crit">읽지 못했습니다 — ${esc(e.message)}</div>`; } };
+  fr.readAsText(f,"utf-8");
+}
+function setSync(ok,txt){
+  $("#syncDot").style.background = ok? cssv("--good") : cssv("--muted");
+  $("#syncTxt").textContent = txt || "데이터";
+}
+async function loadRemote(){
+  try{
+    const r=await fetch("./data/transactions.json",{cache:"no-store"});
+    if(r.ok){
+      const j=await r.json(), arr=Array.isArray(j)?j:(j.transactions||[]);
+      if(arr.length){
+        S.data.transactions=arr.map(t=>({...t,py:t.py||pyOf(t.area)})).sort((a,b)=>b.date.localeCompare(a.date));
+        setSync(true, arr.length.toLocaleString()+"건");
+        $("#dataStamp").textContent = j.updated? "최종 수집 "+j.updated : "";
+      }
+    }
+  }catch(e){}
+  try{
+    const r=await fetch("./data/listings.json",{cache:"no-store"});
+    if(r.ok){
+      const j=await r.json(), arr=Array.isArray(j)? j : (j.listings||[]);
+      if(arr.length && S.lsSeeded){
+        S.data.listings=arr; S.lsSeeded=false;
+        S.lsMeta={updated:j.updated||"", source:j.source||"네이버 부동산", file:""};
+      }
+    }
+  }catch(e){}
+}
+
+/* ═══ 탭 ═══ */
+const DRAW={ overview:()=>chartQuote("cQuote",true),
+  listings:drawListingCharts,
+  price:()=>{chartQuote("cQuote2",false); chartRatio();},
+  deals:renderTrend, place:()=>{renderMap(); chartNb();} };
+function go(id){
+  S.tab=id;
+  $$("#tabs button").forEach(b=>b.setAttribute("aria-selected", String(b.dataset.p===id)));
+  $$(".panel").forEach(p=>p.hidden = p.id!=="p-"+id);
+  DRAW[id]?.();
+  if(location.hash.slice(1)!==id) history.replaceState(null,"","#"+id);
+  const t=$(`#tabs button[data-p="${id}"]`); t?.scrollIntoView({block:"nearest",inline:"nearest"});
+}
+$$("#tabs button").forEach(b=>b.addEventListener("click",()=>go(b.dataset.p)));
+addEventListener("hashchange",()=>{ const h=location.hash.slice(1); if(DRAW[h]!==undefined||$("#p-"+h)) go(h); });
+
+function drawAll(){ DRAW[S.tab]?.(); }
+let rt; addEventListener("resize",()=>{ clearTimeout(rt); rt=setTimeout(drawAll,180); });
+
+/* ═══ 바인딩 ═══ */
+function seg(id,cb){ $$("#"+id+" button").forEach(b=>b.addEventListener("click",()=>{
+  $$("#"+id+" button").forEach(x=>x.setAttribute("aria-pressed","false"));
+  b.setAttribute("aria-pressed","true"); cb(b.dataset.v); })); }
+seg("trendDeal",v=>{S.trend.deal=v; renderTrend();});
+seg("trendPy",  v=>{S.trend.py=v;   renderTrend();});
+seg("txDeal",   v=>{S.tx.deal=v; S.tx.limit=50; renderTx();});
+$("#trendRange").addEventListener("change",e=>{S.trend.range=+e.target.value; renderTrend();});
+$("#txPy").addEventListener("change",e=>{S.tx.py=e.target.value; S.tx.limit=50; renderTx();});
+$("#txSearch").addEventListener("input",e=>{S.tx.q=e.target.value.trim(); S.tx.limit=50; renderTx();});
+$("#txExport").addEventListener("click",()=>{
+  const rows=[["계약일","구분","전용면적","평형","층","금액(만원)","출처"]]
+    .concat(S.data.transactions.map(t=>[t.date,t.deal,t.area,t.py,t.floor,t.amount,t.src||"국토부"]));
+  download("hillstate-giheung-transactions.csv",rows.map(r=>r.join(",")).join("\n"),"text/csv");
+});
+["lsType","lsDong","lsBand","lsSort","lsFav"].forEach(id=>$("#"+id).addEventListener("change",renderListings));
+seg("lsDeal", v=>{ S.lsDeal=v; renderListings(); });
+$("#lsExport").addEventListener("click",()=>download("listings.json",
+  JSON.stringify({updated:S.lsMeta.updated||new Date().toISOString().slice(0,10),
+    source:"네이버 부동산", complex:"힐스테이트기흥",
+    unique:S.data.listings.length, postings:S.data.listings.reduce((s,l)=>s+l.count,0),
+    listings:S.data.listings},null,1),"application/json"));
+const lsdz=$("#lsDrop");
+["dragenter","dragover"].forEach(e=>lsdz.addEventListener(e,ev=>{ev.preventDefault(); lsdz.classList.add("over");}));
+["dragleave","drop"].forEach(e=>lsdz.addEventListener(e,ev=>{ev.preventDefault(); lsdz.classList.remove("over");}));
+lsdz.addEventListener("drop",e=>{const f=e.dataTransfer.files[0]; if(f) ingestListings(f);});
+$("#lsPick").addEventListener("click",()=>$("#lsFile").click());
+$("#lsFile").addEventListener("change",e=>{const f=e.target.files[0]; if(f) ingestListings(f);});
+$("#lsPasteToggle").addEventListener("click",()=>{
+  const b=$("#lsPasteBox"); b.hidden=!b.hidden; if(!b.hidden) $("#lsPasteArea").focus(); });
+$("#lsPasteRead").addEventListener("click",()=>{
+  try{ applyListings(parseListingRows(splitDelimited($("#lsPasteArea").value)),"붙여넣기"); }
+  catch(e){ $("#lsMsg").innerHTML=`<div class="callout crit">읽지 못했습니다 — ${esc(e.message)}</div>`; }
+});
+$("#lsPasteClear").addEventListener("click",()=>{ $("#lsPasteArea").value=""; $("#lsMsg").innerHTML=""; });
+$$("#p-calc input, #p-calc select").forEach(i=>i.addEventListener("input",renderSim));
+const dz=$("#dropzone");
+["dragenter","dragover"].forEach(e=>dz.addEventListener(e,ev=>{ev.preventDefault(); dz.classList.add("over");}));
+["dragleave","drop"].forEach(e=>dz.addEventListener(e,ev=>{ev.preventDefault(); dz.classList.remove("over");}));
+dz.addEventListener("drop",e=>{const f=e.dataTransfer.files[0]; if(f) handleFile(f);});
+$("#pickFile").addEventListener("click",()=>$("#fileInput").click());
+$("#fileInput").addEventListener("change",e=>{const f=e.target.files[0]; if(f) handleFile(f);});
+$("#syncBtn").addEventListener("click",()=>go("data"));
+
+/* ═══ 부팅 ═══ */
+(async function boot(){
+  const cached=safe(()=>localStorage.getItem("ghd-tx"),null);
+  if(cached) try{ const a=JSON.parse(cached); if(a.length>S.data.transactions.length) S.data.transactions=a; }catch(e){}
+  S.lsMeta={...S.data.lsSeed, file:""};
+  loadLocal();
+  await loadRemote();
+  if(S.data.transactions.length>2) setSync(true,S.data.transactions.length.toLocaleString()+"건");
+  renderHero(); renderOverview(); renderTypes(); renderTx(); renderSim(); renderStatic();
+  stampListings(); fillListingFilters(); renderListings();
+  const h=location.hash.slice(1);
+  go($("#p-"+h)? h : "overview");
+  if(document.fonts&&document.fonts.ready) document.fonts.ready.then(drawAll);
+})();
+</script>
+</body>
+</html>
