@@ -1,1 +1,51 @@
+name: 실거래 데이터 갱신
 
+on:
+  schedule:
+    - cron: "0 20 * * *" # UTC 20:00 = KST 05:00
+  workflow_dispatch:
+    inputs:
+      months:
+        description: "수집할 개월 수"
+        default: "36"
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 저장소 파일 불러오기
+        uses: actions/checkout@v4
+
+      - name: Node.js 설치
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: 인증키 확인
+        run: |
+          if [ -z "${{ secrets.DATA_GO_KR_KEY }}" ]; then
+            echo "::error::저장소 시크릿 DATA_GO_KR_KEY가 없습니다."
+            exit 1
+          fi
+
+      - name: 국토부 실거래가 수집
+        env:
+          DATA_GO_KR_KEY: ${{ secrets.DATA_GO_KR_KEY }}
+        run: node scripts/update.mjs --months ${{ github.event.inputs.months || '36' }}
+
+      - name: 변경분 커밋
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A data/transactions.json
+
+          if git diff --cached --quiet; then
+            echo "변경 없음"
+          else
+            git commit -m "chore: 실거래 데이터 갱신 ($(date -u +%Y-%m-%d))"
+            git push
+          fi
