@@ -161,6 +161,240 @@ function renderScatter(target, listings) {
   }));
 }
 
+/* ── 마켓 시트 ─────────────────────────────────────────────
+   실거래는 서로 이어진 시계열이 아니라 개별 관측이다.
+   그래서 점(개별 거래) + 월 중앙값 선 + 월 최저~최고 밴드로 그리고,
+   같은 Y축 오른쪽에 현재 호가 분포를 붙여 체결가와 호가를 한 화면에서 비교한다.
+   색·글꼴을 속성으로 직접 넣어 PNG로 내보내도 그대로 보이게 한다.          */
+const SHEET = {
+  ink:"#12242d", muted:"#6f8189", line:"#e5eded", soft:"#f2f7f7",
+  teal:"#0f766e", teal2:"#14b8a6", orange:"#ea6a1b", red:"#c84b4b",
+  font:"Pretendard, 'Noto Sans KR', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+};
+const monthKey = date => String(date).slice(0, 7);
+/** 축 눈금용: 12.50억 → 12.5억, 15.00억 → 15억 */
+const tickMoney = value => `${(Number(value) / 10000).toFixed(2).replace(/\.?0+$/, "")}억`;
+/** 12.74억 같은 축 눈금 대신 12억·14억처럼 떨어지는 값으로 */
+function niceTicks(lo, hi, count = 5) {
+  const raw = (hi - lo) / Math.max(1, count - 1);
+  if (!Number.isFinite(raw) || raw <= 0) return [lo];
+  const mag = Math.pow(10, Math.floor(Math.log10(raw)));
+  const step = [1, 2, 2.5, 5, 10].map(m => m * mag).find(v => v >= raw) || 10 * mag;
+  const out = [];
+  for (let v = Math.ceil(lo / step) * step; v <= hi + step * 1e-6; v += step) out.push(Math.round(v));
+  return out.length ? out : [lo];
+}
+
+function monthlyStats(rows) {
+  const buckets = new Map();
+  rows.forEach(item => {
+    const key = monthKey(item.date);
+    if (!buckets.has(key)) buckets.set(key, []);
+    buckets.get(key).push(item.amount);
+  });
+  return [...buckets.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([month, values]) => ({
+    month, n: values.length, mid: median(values),
+    min: Math.min(...values), max: Math.max(...values),
+  }));
+}
+
+function renderMarketSheet() {
+  const host = $("#marketSheet");
+  if (!host) return;
+  const tx = filteredTransactions();
+  const listings = filteredListings();
+  const dealLabel = state.filter.deal;
+  const areaLabel = state.filter.area === "all" ? "전체 면적" : `${state.filter.area}㎡`;
+  const basis = dealLabel === "월세" ? " · 보증금 기준" : "";
+  const caption = $("#sheetCaption");
+  if (caption) caption.textContent = `${areaLabel} · ${dealLabel} · 최근 ${state.filter.period}개월${basis}`;
+
+  if (!tx.length && !listings.length) {
+    host.innerHTML = `<div class="chart-empty"><div><strong>조건에 맞는 데이터가 없습니다</strong>거래 구분·면적·기간 필터를 넓혀 보세요.</div></div>`;
+    return;
+  }
+
+  const W = Math.max(320, Math.round(host.clientWidth || 820));
+  const compact = W < 660;
+  const askWidth = listings.length ? (compact ? 74 : 116) : 0;
+  const padL = compact ? 46 : 58;
+  const padR = 16;
+  const headH = compact ? 130 : 92;
+  const plotH = compact ? 236 : 292;
+  const axisH = 30, legendH = 34, footH = 18;
+  const H = headH + plotH + axisH + legendH + footH;
+  const plotTop = headH;
+  const plotBottom = headH + plotH;
+  const plotRight = W - padR - askWidth;
+
+  const months = monthlyStats(tx);
+  const asks = listings.map(item => item.price).filter(Number.isFinite);
+  const askMid = median(asks);
+  const values = [...tx.map(item => item.amount), ...asks].filter(Number.isFinite);
+  let lo = Math.min(...values), hi = Math.max(...values);
+  if (!Number.isFinite(lo)) { lo = 0; hi = 1; }
+  const span = (hi - lo) || Math.max(hi * 0.1, 1);
+  lo -= span * 0.12; hi += span * 0.12;
+
+  const times = tx.map(item => new Date(`${item.date}T00:00:00`).getTime());
+  const tMin = times.length ? Math.min(...times) : Date.now();
+  const tMax = times.length ? Math.max(...times) : Date.now();
+  const X = t => plotL(t);
+  function plotL(t) {
+    if (tMax === tMin) return (padL + plotRight) / 2;
+    return padL + (t - tMin) / (tMax - tMin) * (plotRight - padL);
+  }
+  const Y = v => plotTop + (hi - v) / (hi - lo) * plotH;
+  const px = n => Number(n.toFixed(1));
+
+  const latest = tx[0];
+  const gap = askMid && latest?.amount ? (askMid / latest.amount - 1) * 100 : null;
+  const parts = [];
+  const text = (x, y, str, o = {}) => `<text x="${px(x)}" y="${px(y)}" font-family="${SHEET.font}" font-size="${o.size || 11}" font-weight="${o.weight || 500}" fill="${o.fill || SHEET.muted}" text-anchor="${o.anchor || "start"}"${o.spacing ? ` letter-spacing="${o.spacing}"` : ""}>${esc(str)}</text>`;
+
+  const bg = parts.length; parts.push("");   // 배경은 최종 높이가 정해진 뒤 채운다
+
+  /* 머리글 + 요약 수치 */
+  parts.push(text(padL - 4, 22, `${areaLabel} · ${dealLabel}`, { size: 15, weight: 800, fill: SHEET.ink }));
+  parts.push(text(W - padR, 22, `최근 ${state.filter.period}개월 · 기준 ${latestDate()}`, { anchor: "end", size: 10.5 }));
+  const stats = [
+    ["최근 실거래", latest ? transactionPrice(latest) : "-", latest ? `${latest.date.slice(2)} · ${latest.floor}층` : "해당 없음"],
+    ["기간 중앙값", tx.length ? formatShortMoney(median(tx.map(i => i.amount))) : "-", `${tx.length}건`],
+    ["현재 중간 호가", askMid ? formatShortMoney(askMid) : "-", asks.length ? `${asks.length}건` : "매물 없음"],
+    ["호가 − 실거래", gap == null ? "-" : `${gap >= 0 ? "+" : ""}${gap.toFixed(1)}%`, "중간 호가 대비"],
+  ];
+  const cols = compact ? 2 : 4;
+  const colW = (W - padL - padR + 4) / cols;
+  stats.forEach(([label, value, note], i) => {
+    const cx = padL - 4 + (i % cols) * colW;
+    const cy = 44 + Math.floor(i / cols) * (compact ? 40 : 32);
+    const tone = i === 3 && gap != null ? (gap >= 0 ? SHEET.red : SHEET.teal) : SHEET.ink;
+    parts.push(text(cx, cy, label, { size: 10 }));
+    parts.push(text(cx, cy + 15, value, { size: 15, weight: 800, fill: tone }));
+    parts.push(text(cx, cy + 27, note, { size: 9.5 }));
+  });
+
+  /* Y 그리드 */
+  const ticks = niceTicks(lo, hi, compact ? 4 : 5);
+  ticks.forEach(v => {
+    parts.push(`<line x1="${px(padL)}" y1="${px(Y(v))}" x2="${px(W - padR)}" y2="${px(Y(v))}" stroke="${SHEET.line}" stroke-width="1"/>`);
+    parts.push(text(padL - 8, Y(v) + 3.5, tickMoney(v), { anchor: "end", size: 10 }));
+  });
+
+  /* 월 최저~최고 밴드 + 중앙값 선 */
+  if (months.length > 1) {
+    const mTime = m => new Date(`${m.month}-15T00:00:00`).getTime();
+    const up = months.map(m => `${px(X(mTime(m)))},${px(Y(m.max))}`);
+    const down = [...months].reverse().map(m => `${px(X(mTime(m)))},${px(Y(m.min))}`);
+    parts.push(`<polygon points="${up.concat(down).join(" ")}" fill="${SHEET.teal2}" fill-opacity=".13"/>`);
+    parts.push(`<polyline points="${months.map(m => `${px(X(mTime(m)))},${px(Y(m.mid))}`).join(" ")}" fill="none" stroke="${SHEET.teal}" stroke-width="2.6" stroke-linejoin="round" stroke-linecap="round"/>`);
+    months.forEach(m => {
+      parts.push(`<circle cx="${px(X(mTime(m)))}" cy="${px(Y(m.mid))}" r="3.2" fill="#fff" stroke="${SHEET.teal}" stroke-width="2"><title>${esc(`${m.month} 중앙값 ${formatShortMoney(m.mid)} · ${m.n}건 (${formatShortMoney(m.min)}~${formatShortMoney(m.max)})`)}</title></circle>`);
+    });
+  }
+
+  /* 개별 거래 점 */
+  tx.forEach((item, i) => {
+    const t = new Date(`${item.date}T00:00:00`).getTime();
+    parts.push(`<circle cx="${px(X(t))}" cy="${px(Y(item.amount))}" r="2.9" fill="${SHEET.teal2}" fill-opacity=".38"><title>${esc(`${item.date} ${transactionPrice(item)} · ${item.floor}층${item.dong ? ` · ${item.dong}` : ""}`)}</title></circle>`);
+  });
+  if (latest) {
+    const t = new Date(`${latest.date}T00:00:00`).getTime();
+    parts.push(`<circle cx="${px(X(t))}" cy="${px(Y(latest.amount))}" r="6" fill="none" stroke="${SHEET.ink}" stroke-width="2"/>`);
+  }
+
+  /* X 축 */
+  if (times.length) {
+    const steps = compact ? 3 : 5;
+    const stops = tMax === tMin ? [tMin]
+      : Array.from({ length: steps }, (_, i) => tMin + (tMax - tMin) * i / (steps - 1));
+    stops.forEach((t, i) => {
+      const d = new Date(t).toISOString().slice(2, 7).replace("-", ".");
+      const anchor = i === 0 ? "start" : i === stops.length - 1 ? "end" : "middle";
+      parts.push(text(X(t), plotBottom + 18, d, { anchor, size: 10 }));
+    });
+  }
+
+  /* 현재 호가 스트립 */
+  if (askWidth) {
+    const sx = plotRight + 14;
+    const sw = askWidth - 20;
+    parts.push(`<line x1="${px(sx - 7)}" y1="${px(plotTop)}" x2="${px(sx - 7)}" y2="${px(plotBottom)}" stroke="${SHEET.line}" stroke-width="1" stroke-dasharray="3 4"/>`);
+    parts.push(text(sx + sw / 2, plotTop - 8, "현재 호가", { anchor: "middle", size: 10, weight: 700, fill: SHEET.orange }));
+    const seen = new Map();
+    listings.forEach(item => {
+      const y = Math.round(Y(item.price));
+      const k = Math.round(y / 7);
+      const n = seen.get(k) || 0; seen.set(k, n + 1);
+      const dx = sx + 8 + (n % 5) * (sw / 5.4);
+      parts.push(`<circle cx="${px(dx)}" cy="${px(Y(item.price))}" r="3.4" fill="${SHEET.orange}" fill-opacity=".5"><title>${esc(`${item.dong}동 ${item.type} ${listingPrice(item)} · ${item.band}층`)}</title></circle>`);
+    });
+    if (askMid != null) {
+      parts.push(`<line x1="${px(sx - 3)}" y1="${px(Y(askMid))}" x2="${px(sx + sw + 3)}" y2="${px(Y(askMid))}" stroke="${SHEET.orange}" stroke-width="2.2" stroke-linecap="round"/>`);
+      const lw = formatShortMoney(askMid).length * 6.4 + 8;
+      parts.push(`<rect x="${px(sx + sw / 2 - lw / 2)}" y="${px(Y(askMid) - 18)}" width="${px(lw)}" height="14" rx="7" fill="#ffffff" fill-opacity=".92"/>`);
+      parts.push(text(sx + sw / 2, Y(askMid) - 7.5, formatShortMoney(askMid), { anchor: "middle", size: 10, weight: 800, fill: SHEET.orange }));
+    }
+    parts.push(text(sx + sw / 2, plotBottom + 18, `호가 ${asks.length}건`, { anchor: "middle", size: 10, fill: SHEET.orange, weight: 700 }));
+  }
+
+  /* 범례 + 출처 (한글 폭을 어림해 줄바꿈) */
+  const textW = (str, size) => [...String(str)].reduce((sum, ch) => sum + (ch.charCodeAt(0) > 0x1100 ? size : size * 0.56), 0);
+  const legend = [
+    ["dot", SHEET.teal2, "개별 실거래"],
+    ["line", SHEET.teal, "월 중앙값"],
+    ["band", SHEET.teal2, "월 최저–최고"],
+  ];
+  if (askWidth) legend.push(["dot", SHEET.orange, "현재 호가"]);
+  let lx = padL - 4, ly = plotBottom + axisH + 16;
+  legend.forEach(([kind, color, label]) => {
+    const markW = kind === "dot" ? 12 : 20;
+    const itemW = markW + textW(label, 10.5) + 16;
+    if (lx + itemW > W - padR && lx > padL) { lx = padL - 4; ly += 16; }
+    if (kind === "dot") parts.push(`<circle cx="${px(lx + 4)}" cy="${px(ly - 3)}" r="3.4" fill="${color}" fill-opacity=".55"/>`);
+    else if (kind === "line") parts.push(`<line x1="${px(lx)}" y1="${px(ly - 3)}" x2="${px(lx + 15)}" y2="${px(ly - 3)}" stroke="${color}" stroke-width="2.6" stroke-linecap="round"/>`);
+    else parts.push(`<rect x="${px(lx)}" y="${px(ly - 8)}" width="15" height="10" rx="2" fill="${color}" fill-opacity=".2"/>`);
+    parts.push(text(lx + markW, ly, label, { size: 10.5 }));
+    lx += itemW;
+  });
+  const notes = compact
+    ? ["실거래: 국토교통부 공개 API · 호가: 네이버 부동산 스냅샷", "호가는 희망가로 체결가와 다를 수 있습니다."]
+    : ["실거래: 국토교통부 공개 API · 호가: 네이버 부동산 스냅샷. 호가는 희망가로 체결가와 다를 수 있습니다."];
+  notes.forEach((note, i) => parts.push(text(padL - 4, ly + 20 + i * 12, note, { size: 9.5 })));
+  const H2 = ly + 20 + notes.length * 12;
+
+  parts[bg] = `<rect x="0" y="0" width="${W}" height="${H2}" fill="#ffffff"/>`;
+  host.innerHTML = `<svg viewBox="0 0 ${W} ${H2}" width="100%" height="${H2}" role="img" aria-label="${esc(`${areaLabel} ${dealLabel} 실거래 분포와 현재 호가 비교`)}">${parts.join("")}</svg>`;
+}
+
+async function exportSheetImage() {
+  const svg = $("#marketSheet svg");
+  if (!svg) { toast("먼저 표시할 데이터가 필요합니다."); return; }
+  try {
+    const box = svg.viewBox.baseVal;
+    const scale = 2;
+    const source = new XMLSerializer().serializeToString(svg);
+    const url = URL.createObjectURL(new Blob([source], { type: "image/svg+xml;charset=utf-8" }));
+    const img = new Image();
+    await new Promise((ok, fail) => { img.onload = ok; img.onerror = fail; img.src = url; });
+    const canvas = document.createElement("canvas");
+    canvas.width = box.width * scale; canvas.height = box.height * scale;
+    const ctx = canvas.getContext("2d");
+    ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+    URL.revokeObjectURL(url);
+    const blob = await new Promise(res => canvas.toBlob(res, "image/png"));
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = `힐스테이트기흥_${state.filter.area}_${state.filter.deal}_${latestDate()}.png`;
+    document.body.appendChild(link); link.click(); link.remove();
+    setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+    toast("시트 이미지를 저장했습니다.");
+  } catch (error) {
+    toast("이미지로 저장하지 못했습니다. 화면 캡처를 이용해 주세요.");
+  }
+}
+
 function renderSummary() {
   const tx = filteredTransactions();
   const listings = filteredListings();
@@ -173,14 +407,23 @@ function renderSummary() {
     kpi("최근 실거래", latest ? transactionPrice(latest) : "-", latest ? `${latest.date} · ${latest.floor}층` : "조건에 맞는 거래 없음"),
     kpi("현재 고유 매물", `${formatNumber(listings.length)}<small>건</small>`, `중개소 게시 ${formatNumber(listings.reduce((sum,item)=>sum+(item.count||1),0))}건`),
     kpi("중간 호가", askMedian ? formatShortMoney(askMedian) : "-", asks.length ? `범위 ${formatShortMoney(Math.min(...asks))}~${formatShortMoney(Math.max(...asks))}` : "조건에 맞는 매물 없음"),
-    kpi("호가-최근 실거래", gap == null ? "-" : `${gap >= 0 ? "+" : ""}${gap.toFixed(1)}<small>%</small>`, "중간 호가와 최근 신고가 비교", gap > 0 ? "up" : gap < 0 ? "down" : ""),
+    kpi("호가 − 최근 실거래", gap == null ? "-" : `${gap >= 0 ? "+" : ""}${gap.toFixed(1)}<small>%</small>`, "중간 호가와 최근 신고가 비교", gap > 0 ? "up" : gap < 0 ? "down" : ""),
   ].join("");
-  $("#txChartCaption").textContent = `${state.filter.area === "all" ? "전체 면적" : `${state.filter.area}㎡`} · ${state.filter.deal} · 최근 ${state.filter.period}개월`;
-  renderLineChart("#summaryTxChart", [...tx].reverse().map(item => ({ x:item.date, y:item.amount, label:`${item.date} ${transactionPrice(item)}` })), { yFormat: formatShortMoney, height: 285, singleTitle:"거래가 1건만 있습니다", singleCopy:"기간이나 필터를 넓히면 추이를 볼 수 있습니다." });
+
+  renderMarketSheet();
+
   const all = state.listings.filter(item => areaMatches(item));
   const counts = ["매매","전세","월세"].map(deal => ({ deal, count: all.filter(item=>item.deal===deal).length }));
-  const total = Math.max(1, counts.reduce((sum,item)=>sum+item.count,0));
-  $("#listingMix").innerHTML = `<div class="mix-list">${counts.map(item=>`<div class="mix-row"><span>${item.deal}</span><div class="progress"><span style="width:${item.count/total*100}%"></span></div><strong>${item.count}</strong></div>`).join("")}</div>`;
+  const total = counts.reduce((sum,item)=>sum+item.count,0);
+  const tone = { "매매":"#0f766e", "전세":"#2563a8", "월세":"#ea6a1b" };
+  $("#listingMix").innerHTML = total
+    ? `<div class="mix-stack" role="img" aria-label="거래유형별 매물 구성">
+        ${counts.filter(i=>i.count).map(i=>`<span style="width:${(i.count/total*100).toFixed(2)}%;background:${tone[i.deal]}" title="${i.deal} ${i.count}건"></span>`).join("")}
+       </div>
+       <div class="mix-legend">${counts.map(i=>`<div class="mix-item"><i style="background:${tone[i.deal]}"></i><span>${i.deal}</span><strong>${i.count}</strong><small>${total?Math.round(i.count/total*100):0}%</small></div>`).join("")}</div>
+       <p class="mix-note">전체 ${total}건 · 중개소 중복 게시를 묶은 고유 매물 기준</p>`
+    : emptyState("매물 데이터가 없습니다", "엑셀을 갱신하면 거래유형별 구성이 표시됩니다.");
+
   const change = state.history.changes?.at(-1);
   const events = filteredChange(change);
   $("#recentSignals").innerHTML = change ? `<div class="signal-strip"><div class="signal new"><span>신규</span><b>${events.new.length}건</b><span>${change.from} → ${change.to}</span></div><div class="signal gone"><span>소멸 후보</span><b>${events.gone.length}건</b><span>재등록 가능성 포함</span></div><div class="signal price"><span>가격변동</span><b>${events.priceChanges.length}건</b><span>동일 매물 추적 기준</span></div></div>` : emptyState("변동 기록을 준비했습니다", "다음 날짜의 엑셀을 갱신하면 신규·소멸 후보·가격변동이 표시됩니다.");
@@ -341,6 +584,19 @@ function bind() {
     $$(".subtabs button").forEach(node=>node.classList.toggle("active",node===button));
     $$('[data-transaction-view]').forEach(view=>view.hidden=view.dataset.transactionView!==button.dataset.view);
   }));
+  $("#sheetExport")?.addEventListener("click", exportSheetImage);
+  // 시트는 컨테이너 폭에 맞춰 글자 크기까지 계산하므로 폭이 바뀌면 다시 그린다
+  const sheetHost = $("#marketSheet");
+  if (sheetHost && "ResizeObserver" in window) {
+    let last = 0, timer = null;
+    new ResizeObserver(entries => {
+      const width = Math.round(entries[0].contentRect.width);
+      if (!width || Math.abs(width - last) < 12) return;
+      last = width;
+      clearTimeout(timer);
+      timer = setTimeout(renderMarketSheet, 120);
+    }).observe(sheetHost);
+  }
 }
 
 bind();

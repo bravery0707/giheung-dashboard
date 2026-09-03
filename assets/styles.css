@@ -21,3 +21,36 @@ button,select,input{font:inherit;color:inherit}button,a,select{touch-action:mani
 @media(max-width:900px){.hero-grid{grid-template-columns:1fr 290px;gap:25px}.kpi-grid,.kpi-grid.compact{grid-template-columns:repeat(2,1fr)}.span-4,.span-5,.span-7,.span-8{grid-column:span 12}.filterbar{overflow-x:auto;align-items:flex-end}.filter-group{flex-direction:column;align-items:flex-start;gap:4px}.sync-stamp{display:none}}
 @media(max-width:620px){.wrap{width:min(100% - 24px,var(--max))}.topbar{height:64px}.tabs{top:64px;height:54px}.brand small{display:none}.brand strong{font-size:15px}.brand-mark{width:36px;height:36px}.refresh-button{padding:9px 10px;font-size:11px}.refresh-button span{font-size:15px}.hero-grid{display:block;min-height:0;padding-block:30px}.hero h1{font-size:38px;letter-spacing:-1.8px}.hero-copy{font-size:13px}.hero-card{margin-top:24px;min-height:145px;padding:21px}.hero-price{font-size:29px}.tab-scroll{gap:23px}.main{padding-top:15px}.filterbar{width:calc(100% + 24px);margin-left:-12px;border-left:0;border-right:0;border-radius:0;padding-inline:12px;gap:14px;margin-bottom:28px;box-shadow:none}.filterbar::-webkit-scrollbar{display:none}.segmented button{padding:7px 9px}.section-heading{align-items:flex-start}.section-heading h2{font-size:24px}.section-heading>p{display:none}.kpi-grid,.kpi-grid.compact{gap:9px}.kpi{min-height:102px;padding:15px 14px}.kpi-value{font-size:23px}.dashboard-grid{gap:12px}.card{padding:17px;border-radius:16px}.chart{min-height:230px}.chart-large{min-height:300px}.card-title{align-items:flex-start}.text-button{font-size:11px}.signal-strip{grid-template-columns:1fr}.table-tools{align-items:flex-start;flex-direction:column}.table-tools input{width:100%;min-width:0}.table-wrap{margin-inline:-17px;border-left:0;border-right:0;border-radius:0}table{min-width:620px}.detail-inner{grid-template-columns:1fr}.notice{align-items:flex-start}.change-card{grid-template-columns:76px 1fr}.change-price{grid-column:2}.automation{margin-inline:-1px}.sync-area{gap:0}.section-heading select{max-width:150px}}
 @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}*,*:before,*:after{animation-duration:.01ms!important;transition-duration:.01ms!important}}
+
+/* ── 마켓 시트 · 매물 구성 (요약 탭) ── */
+.heading-tools{display:flex;align-items:center;gap:14px}
+.ghost-button{border:1px solid var(--line);background:#fff;color:var(--teal);border-radius:11px;padding:8px 13px;font-size:12px;font-weight:800;cursor:pointer;white-space:nowrap}
+.ghost-button:hover{border-color:var(--teal);background:var(--teal-soft)}
+.sheet-card{padding-bottom:14px}
+.sheet{position:relative;min-height:300px}
+.sheet svg{width:100%;height:auto;display:block;border-radius:12px}
+.sheet circle{transition:none}
+.sheet circle[fill-opacity]:hover{fill-opacity:.95}
+.mix-stack{display:flex;height:16px;border-radius:999px;overflow:hidden;background:#edf2f2;margin-bottom:16px}
+.mix-stack span{display:block;height:100%}
+.mix-legend{display:grid;gap:10px}
+.mix-item{display:grid;grid-template-columns:10px 1fr auto auto;align-items:center;gap:10px;font-size:12px}
+.mix-item i{width:10px;height:10px;border-radius:3px;display:block}
+.mix-item strong{font-weight:850}
+.mix-item small{color:var(--muted);width:38px;text-align:right}
+.mix-note{color:var(--muted);font-size:11px;margin:14px 0 0}
+@media(max-width:900px){
+  .heading-tools{flex-direction:column;align-items:flex-end;gap:8px}
+  /* 필터는 줄바꿈 대신 가로 스크롤로 — 버튼이 세로로 쪼개지지 않게 */
+  .filterbar{flex-wrap:nowrap}
+  .filterbar .filter-group{flex:0 0 auto}
+  .filterbar .segmented{flex:0 0 auto}
+  .filterbar .segmented button{white-space:nowrap}
+  .filterbar select{min-width:82px}
+}
+@media(max-width:620px){
+  .section-heading{flex-direction:column;gap:10px}
+  .heading-tools{width:100%;flex-direction:row;justify-content:flex-end}
+  .sheet{min-height:0}
+  .sheet-card{padding-bottom:12px}
+}

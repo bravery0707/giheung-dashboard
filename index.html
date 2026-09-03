@@ -70,12 +70,30 @@
     </section>
 
     <section class="panel-page" data-page="summary">
-      <div class="section-heading"><div><span class="kicker">MARKET PULSE</span><h2>오늘의 시장 요약</h2></div><p>카드와 차트는 위 필터에 함께 반응합니다.</p></div>
+      <div class="section-heading">
+        <div><span class="kicker">MARKET PULSE</span><h2>오늘의 시장 요약</h2></div>
+        <div class="heading-tools">
+          <p>카드와 차트는 위 필터에 함께 반응합니다.</p>
+          <button class="ghost-button" id="sheetExport" type="button">시트 이미지 저장</button>
+        </div>
+      </div>
       <div class="kpi-grid" id="summaryKpis"></div>
       <div class="dashboard-grid">
-        <article class="card chart-card span-7"><div class="card-title"><div><h3>실거래가 흐름</h3><p id="txChartCaption"></p></div><button class="text-button" data-go="transactions">전체 거래 보기 →</button></div><div id="summaryTxChart" class="chart"></div></article>
-        <article class="card span-5"><div class="card-title"><div><h3>현재 매물 구성</h3><p>고유 매물 기준</p></div></div><div id="listingMix"></div></article>
-        <article class="card span-12"><div class="card-title"><div><h3>최근 변동 신호</h3><p>소멸은 거래 확정이 아닌 확인이 필요한 후보입니다.</p></div><button class="text-button" data-go="changes">변동 상세 →</button></div><div id="recentSignals"></div></article>
+        <article class="card sheet-card span-12">
+          <div class="card-title">
+            <div><h3>실거래와 호가를 한 장으로</h3><p id="sheetCaption"></p></div>
+            <button class="text-button" data-go="transactions">전체 거래 보기 →</button>
+          </div>
+          <div id="marketSheet" class="sheet"></div>
+        </article>
+        <article class="card span-5">
+          <div class="card-title"><div><h3>현재 매물 구성</h3><p>고유 매물 기준 · 전체 거래유형</p></div></div>
+          <div id="listingMix"></div>
+        </article>
+        <article class="card span-7">
+          <div class="card-title"><div><h3>최근 변동 신호</h3><p>소멸은 거래 확정이 아닌 확인이 필요한 후보입니다.</p></div><button class="text-button" data-go="changes">변동 상세 →</button></div>
+          <div id="recentSignals"></div>
+        </article>
       </div>
     </section>
 
