@@ -12,6 +12,10 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: data-commit
+  cancel-in-progress: false
+
 jobs:
   update:
     runs-on: ubuntu-latest
@@ -37,6 +41,17 @@ jobs:
           DATA_GO_KR_KEY: ${{ secrets.DATA_GO_KR_KEY }}
         run: node scripts/update.mjs --months ${{ github.event.inputs.months || '36' }}
 
+      - name: 수집 결과 요약
+        run: |
+          node -e "
+            const j=require('./data/transactions.json');
+            console.log('updated:', j.updated, '| count:', j.count);
+            console.log('used:', (j.apisUsed||[]).join(', ') || '(없음)');
+            console.log('skipped:', (j.apisSkipped||[]).join(', ') || '(없음)');
+            const d=j.transactions.map(x=>x.date).sort();
+            console.log('거래일 범위:', d[0], '~', d[d.length-1]);
+          "
+
       - name: 변경분 커밋
         run: |
           git config user.name "github-actions[bot]"
@@ -46,6 +61,7 @@ jobs:
           if git diff --cached --quiet; then
             echo "변경 없음"
           else
-            git commit -m "chore: 실거래 데이터 갱신 ($(date -u +%Y-%m-%d))"
+            git commit -m "chore: 실거래 데이터 갱신 ($(TZ=Asia/Seoul date +%F))"
+            git pull --rebase --autostash origin "${GITHUB_REF_NAME}"
             git push
           fi
