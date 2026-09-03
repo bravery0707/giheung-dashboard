@@ -2,7 +2,7 @@ name: 실거래 데이터 갱신
 
 on:
   schedule:
-    - cron: "0 20 * * *" # UTC 20:00 = KST 05:00
+    - cron: "30 23 * * *" # KST 08:30 - 포털이 깨어 있는 시간
   workflow_dispatch:
     inputs:
       months:
@@ -19,6 +19,7 @@ concurrency:
 jobs:
   update:
     runs-on: ubuntu-latest
+timeout-minutes: 25
 
     steps:
       - name: 저장소 파일 불러오기
