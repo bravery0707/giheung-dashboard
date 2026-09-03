@@ -1,0 +1,70 @@
+name: 매물 엑셀 반영
+
+# incoming/listings.xlsx 가 푸시되면 자동으로 스냅샷을 쌓는다.
+# 사람이 하는 일은 "엑셀을 그 경로에 넣고 푸시" 한 번뿐이다.
+on:
+  push:
+    paths:
+      - "incoming/listings.xlsx"
+  workflow_dispatch:
+    inputs:
+      date:
+        description: "스냅샷 날짜 (YYYY-MM-DD, 비우면 엑셀의 최신 등록일자)"
+        default: ""
+
+permissions:
+  contents: write
+
+# 실거래 갱신과 동시에 돌면서 서로 push 를 밀어내지 않게 한다.
+concurrency:
+  group: data-commit
+  cancel-in-progress: false
+
+jobs:
+  import:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 저장소 파일 불러오기
+        uses: actions/checkout@v4
+
+      - name: Node.js 설치
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: 엑셀 확인
+        id: check
+        run: |
+          if [ -f incoming/listings.xlsx ]; then
+            echo "found=true" >> "$GITHUB_OUTPUT"
+            echo "크기: $(stat -c%s incoming/listings.xlsx) bytes"
+          else
+            echo "found=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::incoming/listings.xlsx 가 없어 건너뜁니다."
+          fi
+
+      - name: 매물 스냅샷 반영
+        if: steps.check.outputs.found == 'true'
+        run: |
+          if [ -n "${{ github.event.inputs.date }}" ]; then
+            node scripts/import-listings.mjs incoming/listings.xlsx --date "${{ github.event.inputs.date }}"
+          else
+            node scripts/import-listings.mjs incoming/listings.xlsx
+          fi
+
+      - name: 원본 엑셀 제거 후 커밋
+        if: steps.check.outputs.found == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          rm -f incoming/listings.xlsx
+          git add -A data/listings.json data/listing-history.json incoming
+
+          if git diff --cached --quiet; then
+            echo "변경 없음"
+          else
+            git commit -m "chore: 매물 스냅샷 반영 ($(TZ=Asia/Seoul date +%F))"
+            git pull --rebase --autostash origin "${GITHUB_REF_NAME}"
+            git push
+          fi
