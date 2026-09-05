@@ -1,0 +1,56 @@
+name: 허용된 매물 데이터 시험 수집
+on:
+  schedule:
+    - cron: "10 12 * * *" # 한국시간 21:10, 실제 수집 시각은 별도 저장
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: data-commit
+  cancel-in-progress: false
+jobs:
+  collect:
+    if: vars.LISTINGS_AUTOMATION_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: 허용된 제공처와 시험 기간 확인
+        id: source
+        env:
+          LISTING_FEED_URL: ${{ secrets.LISTING_FEED_URL }}
+        run: node scripts/collect-listings.mjs --check >> "$GITHUB_OUTPUT"
+      - name: 매물 수집과 전체 건수 검증
+        if: steps.source.outputs.ready == 'true'
+        id: collect
+        continue-on-error: true
+        env:
+          LISTING_FEED_URL: ${{ secrets.LISTING_FEED_URL }}
+          LISTING_FEED_TOKEN: ${{ secrets.LISTING_FEED_TOKEN }}
+        run: node scripts/collect-listings.mjs
+      - name: 검증된 데이터 또는 실패 상태 저장
+        if: steps.source.outputs.ready == 'true'
+        env:
+          COLLECT_OUTCOME: ${{ steps.collect.outcome }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/collection-status.json
+          if [ "$COLLECT_OUTCOME" = "success" ]; then
+            git add data/listings.json data/listing-history.json
+          fi
+          if ! git diff --cached --quiet; then
+            git commit -m "chore: 매물 수집 결과 반영"
+            git pull --rebase --autostash origin main
+            git push origin HEAD:main
+          fi
+      - name: 수집 결과 확인
+        if: steps.collect.outcome == 'failure'
+        run: |
+          echo "::error::수집 또는 검증 실패. 이전 매물 데이터는 유지했습니다."
+          exit 1
