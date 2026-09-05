@@ -1,0 +1,14 @@
+{
+  "enabled": false,
+  "source": "",
+  "allowedOrigin": "",
+  "permission": {
+    "collection": false,
+    "publicRedistribution": false,
+    "reference": ""
+  },
+  "trial": {
+    "startDate": null,
+    "days": 14
+  }
+}
