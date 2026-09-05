@@ -1,0 +1,17 @@
+name: 매물 처리 검증
+on:
+  pull_request:
+  push:
+    branches: [main]
+    paths: ["scripts/**", "assets/listing-history.mjs", "tests/**", ".github/workflows/tests.yml"]
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: node --test tests/*.test.mjs
