@@ -168,7 +168,12 @@ function renderScatter(target, listings) {
    색·글꼴을 속성으로 직접 넣어 PNG로 내보내도 그대로 보이게 한다.          */
 const SHEET = {
   ink:"#12242d", muted:"#6f8189", line:"#e5eded", soft:"#f2f7f7",
-  teal:"#0f766e", teal2:"#14b8a6", orange:"#ea6a1b", red:"#c84b4b",
+  /* 색은 눈으로 고르지 않고 검증기로 통과시킨 값이다.
+     teal↔orange 는 적록색약(protan) ΔE 12.5 로 갈라지고, 흰 바탕 대비도 3:1 이상이다. */
+  teal:"#0f9488", teal2:"#14b8a6", orange:"#ea6a1b", red:"#c84b4b",
+  /* 층 구간은 순서가 있는 값이라 색상 하나의 명도 3단계로 — 무지개는 순서를 못 만든다.
+     명도 L 0.70 → 0.60 → 0.40 으로 단조 증가한다. */
+  f1:"#3fb5a4", f2:"#0f9488", f3:"#0a544d",
   font:"Pretendard, 'Noto Sans KR', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
 };
 const monthKey = date => String(date).slice(0, 7);
@@ -198,6 +203,74 @@ function monthlyStats(rows) {
   }));
 }
 
+/* ── 통계: Theil–Sen 강건 회귀 ────────────────────────────────────
+   최소제곱은 이상치 한 건에 기울기가 끌려간다. 실거래는 월 2~5건이라
+   신고가 한 건이 추세를 통째로 왜곡한다. Theil–Sen 은 모든 점쌍의 기울기를
+   구해 그 중앙값을 쓰기 때문에 표본의 29%까지 오염돼도 버틴다.
+   예측이 아니라 '지금까지의 추세를 그대로 늘렸을 때'를 그리는 용도다. */
+function theilSen(points) {
+  const n = points.length;
+  if (n < 3) return null;
+  const slopes = [];
+  for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) {
+    const dx = points[j].x - points[i].x;
+    if (dx !== 0) slopes.push((points[j].y - points[i].y) / dx);
+  }
+  if (!slopes.length) return null;
+  const slope = median(slopes);
+  const intercept = median(points.map(p => p.y - slope * p.x));
+  const resid = points.map(p => p.y - (intercept + slope * p.x));
+  // MAD × 1.4826 = 정규분포에서 표준편차와 같아지는 강건 산포
+  const mad = median(resid.map(r => Math.abs(r)));
+  const sigma = Math.max(mad * 1.4826, 1e-6);
+  return { slope, intercept, sigma, n, at: x => intercept + slope * x };
+}
+
+/** 추세 연장 + 불확실성 구간. 예측이 아니라 '이대로 가면' 구간이다.
+    창(window)을 최근 12개월로 자르는 이유: 3년 기울기로 다음 달을 말하면
+    2년 전 횡보장이 오늘의 상승을 끌어내린다. 추세는 최근 것이 추세다. */
+function trendProjection(months, horizon = 3) {
+  if (months.length < 6) return null;
+  const win = months.slice(-12);              // 적합 구간
+  const n = win.length;
+  const pts = win.map((m, i) => ({ x: i, y: m.mid }));
+  const fit = theilSen(pts);
+  if (!fit) return null;
+
+  /* 구간 폭은 회귀의 예측구간 공식을 그대로 쓴다.
+     se(h) = σ·√(1 + 1/n + (xh−x̄)²/Σ(xi−x̄)²)
+     — 외삽이 멀어질수록 마지막 항이 커져 자연스럽게 벌어진다. 임의 계수가 없다. */
+  const xbar = (n - 1) / 2;
+  const sxx = pts.reduce((a, p) => a + (p.x - xbar) ** 2, 0) || 1;
+  const z = 1.28;                              // 약 80% 구간
+
+  const last = win[n - 1].month;
+  const [ly, lm] = last.split("-").map(Number);
+  const out = [];
+  for (let h = 1; h <= horizon; h++) {
+    const x = n - 1 + h;
+    const d = new Date(ly, lm - 1 + h, 15);
+    const se = fit.sigma * Math.sqrt(1 + 1 / n + (x - xbar) ** 2 / sxx);
+    const mid = fit.at(x);
+    out.push({
+      month: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`,
+      time: d.getTime(), mid, lo: mid - z * se, hi: mid + z * se, h,
+    });
+  }
+
+  /* 적합선을 창 구간에 옅게 깔아두면, 점선이 어디서 이어져 나오는지 눈에 보인다.
+     이게 없으면 마지막 실거래에서 점선이 뚝 떨어진 것처럼 읽혀 폭락 예고로 오해된다. */
+  const fitted = win.map((m, i) => ({
+    time: new Date(`${m.month}-15T00:00:00`).getTime(), y: fit.at(i),
+  }));
+
+  const base = win[n - 1].mid || 1;
+  return {
+    points: out, fitted, slope: fit.slope, pctPerMonth: fit.slope / base * 100,
+    sigma: fit.sigma, n, windowFrom: win[0].month,
+  };
+}
+
 function renderMarketSheet() {
   const host = $("#marketSheet");
   if (!host) return;
@@ -214,63 +287,88 @@ function renderMarketSheet() {
     return;
   }
 
+  // 리사이즈·필터 변경으로 다시 그릴 때는 애니메이션을 붙이지 않는다.
+  const motionOK = !window.matchMedia?.("(prefers-reduced-motion: reduce)").matches
+    && !document.body.classList.contains("no-anim");
   const W = Math.max(320, Math.round(host.clientWidth || 820));
   const compact = W < 660;
   const askWidth = listings.length ? (compact ? 74 : 116) : 0;
   const padL = compact ? 46 : 58;
   const padR = 16;
   const headH = compact ? 130 : 92;
-  const plotH = compact ? 236 : 292;
-  const axisH = 30, legendH = 34, footH = 18;
-  const H = headH + plotH + axisH + legendH + footH;
+  const plotH = compact ? 224 : 280;
+  const volH = compact ? 30 : 38;          // 월 거래량 스트립
+  const axisH = 28, footH = 18;
   const plotTop = headH;
   const plotBottom = headH + plotH;
+  const volTop = plotBottom + 10;
+  const volBottom = volTop + volH;
   const plotRight = W - padR - askWidth;
 
   const months = monthlyStats(tx);
   const asks = listings.map(item => item.price).filter(Number.isFinite);
   const askMid = median(asks);
-  const values = [...tx.map(item => item.amount), ...asks].filter(Number.isFinite);
+
+  /* 추세 연장 — 6개월 이상 자료가 있을 때만, 최대 3개월 앞까지 */
+  const proj = months.length >= 6 ? trendProjection(months, compact ? 2 : 3) : null;
+
+  const values = [
+    ...tx.map(item => item.amount), ...asks,
+    ...(proj ? proj.points.flatMap(p => [p.lo, p.hi]) : []),
+  ].filter(Number.isFinite);
   let lo = Math.min(...values), hi = Math.max(...values);
   if (!Number.isFinite(lo)) { lo = 0; hi = 1; }
   const span = (hi - lo) || Math.max(hi * 0.1, 1);
-  lo -= span * 0.12; hi += span * 0.12;
+  lo -= span * 0.1; hi += span * 0.1;
 
   const times = tx.map(item => new Date(`${item.date}T00:00:00`).getTime());
   const tMin = times.length ? Math.min(...times) : Date.now();
-  const tMax = times.length ? Math.max(...times) : Date.now();
-  const X = t => plotL(t);
-  function plotL(t) {
-    if (tMax === tMin) return (padL + plotRight) / 2;
-    return padL + (t - tMin) / (tMax - tMin) * (plotRight - padL);
-  }
+  const tActual = times.length ? Math.max(...times) : Date.now();
+  const tMax = proj ? proj.points.at(-1).time : tActual;
+  const X = t => (tMax === tMin ? (padL + plotRight) / 2
+    : padL + (t - tMin) / (tMax - tMin) * (plotRight - padL));
   const Y = v => plotTop + (hi - v) / (hi - lo) * plotH;
   const px = n => Number(n.toFixed(1));
+  const mTime = m => new Date(`${m.month}-15T00:00:00`).getTime();
 
+  /* 층 구간은 순서형이라 한 색상의 명도 3단계로 인코딩한다. 크기는 건드리지 않는다 —
+     점 크기는 '금액이 크다'로 읽히기 때문에 층수에 쓰면 거짓말이 된다. */
+  const bandInk = { "저": SHEET.f1, "중": SHEET.f2, "고": SHEET.f3 };
+  const bandOf = item => item.band || bandOfFloor(item.floor);
+
+  const recent3 = (() => {
+    const cut = months.slice(-3).map(m => m.month);
+    const rows = tx.filter(t => cut.includes(monthKey(t.date))).map(t => t.amount);
+    return rows.length ? median(rows) : null;
+  })();
   const latest = tx[0];
-  const gap = askMid && latest?.amount ? (askMid / latest.amount - 1) * 100 : null;
+  const gapBase = recent3 ?? latest?.amount;
+  const gap = askMid && gapBase ? (askMid / gapBase - 1) * 100 : null;
+
   const parts = [];
-  const text = (x, y, str, o = {}) => `<text x="${px(x)}" y="${px(y)}" font-family="${SHEET.font}" font-size="${o.size || 11}" font-weight="${o.weight || 500}" fill="${o.fill || SHEET.muted}" text-anchor="${o.anchor || "start"}"${o.spacing ? ` letter-spacing="${o.spacing}"` : ""}>${esc(str)}</text>`;
+  const text = (x, y, str, o = {}) => `<text x="${px(x)}" y="${px(y)}" font-family="${SHEET.font}" font-size="${o.size || 11}" font-weight="${o.weight || 500}" fill="${o.fill || SHEET.muted}" text-anchor="${o.anchor || "start"}"${o.spacing ? ` letter-spacing="${o.spacing}"` : ""}${o.cls ? ` class="${o.cls}"` : ""}${o.extra || ""}>${esc(str)}</text>`;
 
   const bg = parts.length; parts.push("");   // 배경은 최종 높이가 정해진 뒤 채운다
+  const defs = parts.length; parts.push("");
 
   /* 머리글 + 요약 수치 */
   parts.push(text(padL - 4, 22, `${areaLabel} · ${dealLabel}`, { size: 15, weight: 800, fill: SHEET.ink }));
   parts.push(text(W - padR, 22, `최근 ${state.filter.period}개월 · 기준 ${latestDate()}`, { anchor: "end", size: 10.5 }));
   const stats = [
-    ["최근 실거래", latest ? transactionPrice(latest) : "-", latest ? `${latest.date.slice(2)} · ${latest.floor}층` : "해당 없음"],
-    ["기간 중앙값", tx.length ? formatShortMoney(median(tx.map(i => i.amount))) : "-", `${tx.length}건`],
-    ["현재 중간 호가", askMid ? formatShortMoney(askMid) : "-", asks.length ? `${asks.length}건` : "매물 없음"],
-    ["호가 − 실거래", gap == null ? "-" : `${gap >= 0 ? "+" : ""}${gap.toFixed(1)}%`, "중간 호가 대비"],
+    ["최근 실거래", latest ? transactionPrice(latest) : "-", latest ? `${latest.date.slice(2)} · ${latest.floor}층` : "해당 없음", null],
+    ["최근 3개월 중앙값", recent3 ? formatShortMoney(recent3) : "-", `기간 전체 ${tx.length}건`, null],
+    ["현재 중간 호가", askMid ? formatShortMoney(askMid) : "-", asks.length ? `${asks.length}건` : "매물 없음", null],
+    ["호가 − 실거래", gap == null ? "-" : `${gap >= 0 ? "+" : ""}${gap.toFixed(1)}%`,
+      recent3 ? "최근 3개월 중앙값 대비" : "최근 실거래 대비",
+      gap == null ? null : (gap >= 0 ? SHEET.red : SHEET.teal)],
   ];
   const cols = compact ? 2 : 4;
   const colW = (W - padL - padR + 4) / cols;
-  stats.forEach(([label, value, note], i) => {
+  stats.forEach(([label, value, note, tone], i) => {
     const cx = padL - 4 + (i % cols) * colW;
     const cy = 44 + Math.floor(i / cols) * (compact ? 40 : 32);
-    const tone = i === 3 && gap != null ? (gap >= 0 ? SHEET.red : SHEET.teal) : SHEET.ink;
     parts.push(text(cx, cy, label, { size: 10 }));
-    parts.push(text(cx, cy + 15, value, { size: 15, weight: 800, fill: tone }));
+    parts.push(text(cx, cy + 15, value, { size: 15, weight: 800, fill: tone || SHEET.ink, cls: "s-rise", extra: ` style="animation-delay:${60 + i * 55}ms"` }));
     parts.push(text(cx, cy + 27, note, { size: 9.5 }));
   });
 
@@ -281,27 +379,67 @@ function renderMarketSheet() {
     parts.push(text(padL - 8, Y(v) + 3.5, tickMoney(v), { anchor: "end", size: 10 }));
   });
 
+  /* 추세 연장 구간 — 실거래가 끝난 지점부터 오른쪽 */
+  if (proj) {
+    // 적합선을 옅게 깔아 점선이 이어져 나오는 지점을 보여준다
+    parts.push(`<polyline class="s-band" points="${proj.fitted.map(f => `${px(X(f.time))},${px(Y(f.y))}`).join(" ")}" fill="none" stroke="${SHEET.teal}" stroke-width="1.4" stroke-opacity=".38" stroke-dasharray="2 3"/>`);
+
+    const anchor = { time: proj.fitted.at(-1).time, mid: proj.fitted.at(-1).y };
+    const up = [`${px(X(anchor.time))},${px(Y(anchor.mid))}`,
+      ...proj.points.map(p => `${px(X(p.time))},${px(Y(p.hi))}`)];
+    const down = [...proj.points].reverse().map(p => `${px(X(p.time))},${px(Y(p.lo))}`);
+    parts.push(`<polygon class="s-band" points="${up.concat(down).join(" ")}" fill="url(#projHatch)" stroke="${SHEET.teal}" stroke-opacity=".28" stroke-width="1" stroke-dasharray="3 3"/>`);
+    parts.push(`<polyline class="s-band" points="${[`${px(X(anchor.time))},${px(Y(anchor.mid))}`, ...proj.points.map(p => `${px(X(p.time))},${px(Y(p.mid))}`)].join(" ")}" fill="none" stroke="${SHEET.teal}" stroke-width="2.2" stroke-dasharray="6 5" stroke-linecap="round" stroke-opacity=".85"/>`);
+
+    // '오늘' 경계 — 여기서부터는 자료가 아니라 계산이라는 표시
+    parts.push(`<line x1="${px(X(tActual))}" y1="${px(plotTop - 4)}" x2="${px(X(tActual))}" y2="${px(volBottom)}" stroke="${SHEET.muted}" stroke-width="1" stroke-dasharray="2 4" stroke-opacity=".7"/>`);
+    parts.push(text(X(tActual) + 4, plotTop + 9, "추세 연장 →", { size: 9.5, weight: 700, fill: SHEET.teal }));
+    proj.points.forEach(p => {
+      parts.push(`<circle class="s-band" cx="${px(X(p.time))}" cy="${px(Y(p.mid))}" r="3" fill="#fff" stroke="${SHEET.teal}" stroke-width="1.8" stroke-dasharray="2.4 2"/>`);
+    });
+    const tip = proj.points.at(-1);
+    if (!compact) {
+      const lw = formatShortMoney(tip.mid).length * 6.6 + 10;
+      parts.push(`<rect class="s-band" x="${px(Math.min(X(tip.time) - lw / 2, plotRight - lw))}" y="${px(Y(tip.mid) - 20)}" width="${px(lw)}" height="15" rx="7.5" fill="#ffffff" fill-opacity=".94" stroke="${SHEET.teal}" stroke-opacity=".35"/>`);
+      parts.push(text(Math.min(X(tip.time), plotRight - lw / 2), Y(tip.mid) - 9, formatShortMoney(tip.mid), { anchor: "middle", size: 10, weight: 800, fill: SHEET.teal, cls: "s-band" }));
+    }
+  }
+
   /* 월 최저~최고 밴드 + 중앙값 선 */
   if (months.length > 1) {
-    const mTime = m => new Date(`${m.month}-15T00:00:00`).getTime();
     const up = months.map(m => `${px(X(mTime(m)))},${px(Y(m.max))}`);
     const down = [...months].reverse().map(m => `${px(X(mTime(m)))},${px(Y(m.min))}`);
-    parts.push(`<polygon points="${up.concat(down).join(" ")}" fill="${SHEET.teal2}" fill-opacity=".13"/>`);
-    parts.push(`<polyline points="${months.map(m => `${px(X(mTime(m)))},${px(Y(m.mid))}`).join(" ")}" fill="none" stroke="${SHEET.teal}" stroke-width="2.6" stroke-linejoin="round" stroke-linecap="round"/>`);
-    months.forEach(m => {
-      parts.push(`<circle cx="${px(X(mTime(m)))}" cy="${px(Y(m.mid))}" r="3.2" fill="#fff" stroke="${SHEET.teal}" stroke-width="2"><title>${esc(`${m.month} 중앙값 ${formatShortMoney(m.mid)} · ${m.n}건 (${formatShortMoney(m.min)}~${formatShortMoney(m.max)})`)}</title></circle>`);
+    parts.push(`<polygon class="s-band" points="${up.concat(down).join(" ")}" fill="${SHEET.teal2}" fill-opacity=".13"/>`);
+    const line = months.map(m => `${px(X(mTime(m)))},${px(Y(m.mid))}`).join(" ");
+    parts.push(`<polyline class="s-draw" points="${line}" fill="none" stroke="${SHEET.teal}" stroke-width="2.6" stroke-linejoin="round" stroke-linecap="round" pathLength="1"/>`);
+    months.forEach((m, i) => {
+      parts.push(`<circle class="s-pop" style="animation-delay:${Math.min(520, 200 + i * 22)}ms" cx="${px(X(mTime(m)))}" cy="${px(Y(m.mid))}" r="3.2" fill="#fff" stroke="${SHEET.teal}" stroke-width="2"/>`);
     });
   }
 
-  /* 개별 거래 점 */
+  /* 개별 거래 점 — 층 구간을 한 색상의 명도로 */
   tx.forEach((item, i) => {
     const t = new Date(`${item.date}T00:00:00`).getTime();
-    parts.push(`<circle cx="${px(X(t))}" cy="${px(Y(item.amount))}" r="2.9" fill="${SHEET.teal2}" fill-opacity=".38"><title>${esc(`${item.date} ${transactionPrice(item)} · ${item.floor}층${item.dong ? ` · ${item.dong}` : ""}`)}</title></circle>`);
+    parts.push(`<circle class="s-dot" style="animation-delay:${Math.min(600, i * 9)}ms" cx="${px(X(t))}" cy="${px(Y(item.amount))}" r="3.1" fill="${bandInk[bandOf(item)] || SHEET.teal2}" fill-opacity=".72" stroke="#ffffff" stroke-width=".8"/>`);
   });
   if (latest) {
-    const t = new Date(`${latest.date}T00:00:00`).getTime();
-    parts.push(`<circle cx="${px(X(t))}" cy="${px(Y(latest.amount))}" r="6" fill="none" stroke="${SHEET.ink}" stroke-width="2"/>`);
+    parts.push(`<circle class="s-pop" style="animation-delay:640ms" cx="${px(X(new Date(`${latest.date}T00:00:00`).getTime()))}" cy="${px(Y(latest.amount))}" r="6" fill="none" stroke="${SHEET.ink}" stroke-width="2"/>`);
   }
+
+  /* 월 거래량 스트립 — 같은 X축을 쓰는 보조 지표.
+     중앙값 선의 신뢰도를 읽는 장치다. 2건짜리 달의 중앙값은 중앙값이 아니다. */
+  const volMax = Math.max(1, ...months.map(m => m.n));
+  const slot = months.length > 1
+    ? Math.abs(X(mTime(months[1])) - X(mTime(months[0]))) : 18;
+  const barW = Math.max(2.5, Math.min(14, slot * 0.62));
+  parts.push(`<line x1="${px(padL)}" y1="${px(volBottom)}" x2="${px(plotRight)}" y2="${px(volBottom)}" stroke="${SHEET.line}" stroke-width="1"/>`);
+  parts.push(text(padL - 8, volTop + 9, "건수", { anchor: "end", size: 9.5 }));
+  months.forEach((m, i) => {
+    const h = Math.max(2, m.n / volMax * (volH - 6));
+    parts.push(`<rect class="s-bar" style="animation-delay:${Math.min(560, 240 + i * 16)}ms" x="${px(X(mTime(m)) - barW / 2)}" y="${px(volBottom - h)}" width="${px(barW)}" height="${px(h)}" rx="${px(Math.min(2, barW / 2))}" fill="${SHEET.teal}" fill-opacity=".3" transform-origin="${px(X(mTime(m)))}px ${px(volBottom)}px"/>`);
+  });
+  // 좁은 화면에선 막대와 겹친다. 같은 값이 호버 판독기에 있으니 여기선 생략한다.
+  if (!compact) parts.push(text(plotRight, volTop + 9, `월 최대 ${volMax}건`, { anchor: "end", size: 9.5 }));
 
   /* X 축 */
   if (times.length) {
@@ -311,7 +449,7 @@ function renderMarketSheet() {
     stops.forEach((t, i) => {
       const d = new Date(t).toISOString().slice(2, 7).replace("-", ".");
       const anchor = i === 0 ? "start" : i === stops.length - 1 ? "end" : "middle";
-      parts.push(text(X(t), plotBottom + 18, d, { anchor, size: 10 }));
+      parts.push(text(X(t), volBottom + 18, d, { anchor, size: 10 }));
     });
   }
 
@@ -322,49 +460,156 @@ function renderMarketSheet() {
     parts.push(`<line x1="${px(sx - 7)}" y1="${px(plotTop)}" x2="${px(sx - 7)}" y2="${px(plotBottom)}" stroke="${SHEET.line}" stroke-width="1" stroke-dasharray="3 4"/>`);
     parts.push(text(sx + sw / 2, plotTop - 8, "현재 호가", { anchor: "middle", size: 10, weight: 700, fill: SHEET.orange }));
     const seen = new Map();
-    listings.forEach(item => {
-      const y = Math.round(Y(item.price));
-      const k = Math.round(y / 7);
+    listings.forEach((item, i) => {
+      const k = Math.round(Y(item.price) / 7);
       const n = seen.get(k) || 0; seen.set(k, n + 1);
       const dx = sx + 8 + (n % 5) * (sw / 5.4);
-      parts.push(`<circle cx="${px(dx)}" cy="${px(Y(item.price))}" r="3.4" fill="${SHEET.orange}" fill-opacity=".5"><title>${esc(`${item.dong}동 ${item.type} ${listingPrice(item)} · ${item.band}층`)}</title></circle>`);
+      parts.push(`<circle class="s-dot" style="animation-delay:${Math.min(600, 120 + i * 9)}ms" cx="${px(dx)}" cy="${px(Y(item.price))}" r="3.4" fill="${SHEET.orange}" fill-opacity=".55" stroke="#ffffff" stroke-width=".8"/>`);
     });
     if (askMid != null) {
-      parts.push(`<line x1="${px(sx - 3)}" y1="${px(Y(askMid))}" x2="${px(sx + sw + 3)}" y2="${px(Y(askMid))}" stroke="${SHEET.orange}" stroke-width="2.2" stroke-linecap="round"/>`);
+      parts.push(`<line class="s-band" x1="${px(sx - 3)}" y1="${px(Y(askMid))}" x2="${px(sx + sw + 3)}" y2="${px(Y(askMid))}" stroke="${SHEET.orange}" stroke-width="2.2" stroke-linecap="round"/>`);
       const lw = formatShortMoney(askMid).length * 6.4 + 8;
-      parts.push(`<rect x="${px(sx + sw / 2 - lw / 2)}" y="${px(Y(askMid) - 18)}" width="${px(lw)}" height="14" rx="7" fill="#ffffff" fill-opacity=".92"/>`);
-      parts.push(text(sx + sw / 2, Y(askMid) - 7.5, formatShortMoney(askMid), { anchor: "middle", size: 10, weight: 800, fill: SHEET.orange }));
+      parts.push(`<rect class="s-band" x="${px(sx + sw / 2 - lw / 2)}" y="${px(Y(askMid) - 18)}" width="${px(lw)}" height="14" rx="7" fill="#ffffff" fill-opacity=".92"/>`);
+      parts.push(text(sx + sw / 2, Y(askMid) - 7.5, formatShortMoney(askMid), { anchor: "middle", size: 10, weight: 800, fill: SHEET.orange, cls: "s-band" }));
     }
-    parts.push(text(sx + sw / 2, plotBottom + 18, `호가 ${asks.length}건`, { anchor: "middle", size: 10, fill: SHEET.orange, weight: 700 }));
+    parts.push(text(sx + sw / 2, volBottom + 18, `호가 ${asks.length}건`, { anchor: "middle", size: 10, fill: SHEET.orange, weight: 700 }));
   }
+
+  /* 호버 크로스헤어 — 그려만 두고 자바스크립트가 위치를 옮긴다 */
+  const cross = parts.length; parts.push("");
 
   /* 범례 + 출처 (한글 폭을 어림해 줄바꿈) */
   const textW = (str, size) => [...String(str)].reduce((sum, ch) => sum + (ch.charCodeAt(0) > 0x1100 ? size : size * 0.56), 0);
   const legend = [
-    ["dot", SHEET.teal2, "개별 실거래"],
+    ["dot", SHEET.f1, "저층 거래"],
+    ["dot", SHEET.f2, "중층"],
+    ["dot", SHEET.f3, "고층"],
     ["line", SHEET.teal, "월 중앙값"],
     ["band", SHEET.teal2, "월 최저–최고"],
   ];
+  if (proj) legend.push(["dash", SHEET.teal, "추세 연장·불확실성"]);
   if (askWidth) legend.push(["dot", SHEET.orange, "현재 호가"]);
-  let lx = padL - 4, ly = plotBottom + axisH + 16;
+  let lx = padL - 4, ly = volBottom + axisH + 14;
   legend.forEach(([kind, color, label]) => {
-    const markW = kind === "dot" ? 12 : 20;
-    const itemW = markW + textW(label, 10.5) + 16;
+    const markW = kind === "dot" ? 12 : 22;
+    const itemW = markW + textW(label, 10.5) + 14;
     if (lx + itemW > W - padR && lx > padL) { lx = padL - 4; ly += 16; }
-    if (kind === "dot") parts.push(`<circle cx="${px(lx + 4)}" cy="${px(ly - 3)}" r="3.4" fill="${color}" fill-opacity=".55"/>`);
-    else if (kind === "line") parts.push(`<line x1="${px(lx)}" y1="${px(ly - 3)}" x2="${px(lx + 15)}" y2="${px(ly - 3)}" stroke="${color}" stroke-width="2.6" stroke-linecap="round"/>`);
-    else parts.push(`<rect x="${px(lx)}" y="${px(ly - 8)}" width="15" height="10" rx="2" fill="${color}" fill-opacity=".2"/>`);
+    if (kind === "dot") parts.push(`<circle cx="${px(lx + 4)}" cy="${px(ly - 3)}" r="3.4" fill="${color}" fill-opacity=".75"/>`);
+    else if (kind === "line") parts.push(`<line x1="${px(lx)}" y1="${px(ly - 3)}" x2="${px(lx + 16)}" y2="${px(ly - 3)}" stroke="${color}" stroke-width="2.6" stroke-linecap="round"/>`);
+    else if (kind === "dash") parts.push(`<line x1="${px(lx)}" y1="${px(ly - 3)}" x2="${px(lx + 16)}" y2="${px(ly - 3)}" stroke="${color}" stroke-width="2.2" stroke-dasharray="5 4" stroke-linecap="round"/>`);
+    else parts.push(`<rect x="${px(lx)}" y="${px(ly - 8)}" width="16" height="10" rx="2" fill="${color}" fill-opacity=".2"/>`);
     parts.push(text(lx + markW, ly, label, { size: 10.5 }));
     lx += itemW;
   });
-  const notes = compact
-    ? ["실거래: 국토교통부 공개 API · 호가: 네이버 부동산 스냅샷", "호가는 희망가로 체결가와 다를 수 있습니다."]
-    : ["실거래: 국토교통부 공개 API · 호가: 네이버 부동산 스냅샷. 호가는 희망가로 체결가와 다를 수 있습니다."];
-  notes.forEach((note, i) => parts.push(text(padL - 4, ly + 20 + i * 12, note, { size: 9.5 })));
-  const H2 = ly + 20 + notes.length * 12;
+
+  const notes = [];
+  if (proj) {
+    const dir = proj.slope >= 0 ? "상승" : "하락";
+    notes.push(`추세 연장: 최근 ${proj.n}개월(${proj.windowFrom.replace("-", ".")}~) 중앙값에 Theil–Sen 강건회귀를 맞춘 기울기 월 ${proj.pctPerMonth >= 0 ? "+" : ""}${proj.pctPerMonth.toFixed(2)}%(${dir}), 음영은 약 80% 예측구간. 예측이 아니라 "이대로면" 구간이며 규제·금리 변화로 쉽게 깨집니다.`);
+  }
+  notes.push("실거래: 국토교통부 공개 API · 호가: 네이버 부동산 스냅샷. 호가는 희망가로 체결가와 다릅니다.");
+  const wrapped = [];
+  notes.forEach(note => {
+    const maxW = W - padL - padR;
+    let line = "";
+    [...note].forEach(ch => {
+      if (textW(line + ch, 9.5) > maxW) { wrapped.push(line); line = ""; }
+      line += ch;
+    });
+    if (line) wrapped.push(line);
+  });
+  wrapped.forEach((note, i) => parts.push(text(padL - 4, ly + 20 + i * 12, note, { size: 9.5 })));
+  const H2 = ly + 20 + wrapped.length * 12 + 2;
 
   parts[bg] = `<rect x="0" y="0" width="${W}" height="${H2}" fill="#ffffff"/>`;
-  host.innerHTML = `<svg viewBox="0 0 ${W} ${H2}" width="100%" height="${H2}" role="img" aria-label="${esc(`${areaLabel} ${dealLabel} 실거래 분포와 현재 호가 비교`)}">${parts.join("")}</svg>`;
+  parts[defs] = `<defs><pattern id="projHatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="6" height="6" fill="${SHEET.teal2}" fill-opacity=".07"/><line x1="0" y1="0" x2="0" y2="6" stroke="${SHEET.teal}" stroke-width="1.4" stroke-opacity=".22"/></pattern></defs>`;
+  parts[cross] = `<g class="s-cross" opacity="0" pointer-events="none"><line y1="${px(plotTop - 6)}" y2="${px(volBottom)}" stroke="${SHEET.ink}" stroke-width="1" stroke-opacity=".35"/></g>`;
+
+  const anim = motionOK ? `<style data-anim="1">
+    .s-draw{stroke-dasharray:1;stroke-dashoffset:1;animation:sDraw .9s cubic-bezier(.22,.61,.36,1) forwards}
+    .s-band{opacity:0;animation:sFade .6s ease-out .45s forwards}
+    .s-pop{opacity:0;animation:sFade .35s ease-out forwards}
+    .s-dot{opacity:0;animation:sFade .4s ease-out forwards}
+    .s-bar{opacity:0;transform:scaleY(.2);animation:sBar .45s cubic-bezier(.22,.61,.36,1) forwards}
+    .s-rise{opacity:0;transform:translateY(6px);animation:sRise .5s cubic-bezier(.22,.61,.36,1) forwards}
+    @keyframes sDraw{to{stroke-dashoffset:0}}
+    @keyframes sFade{to{opacity:1}}
+    @keyframes sBar{to{opacity:1;transform:scaleY(1)}}
+    @keyframes sRise{to{opacity:1;transform:translateY(0)}}
+  </style>` : "";
+
+  host.innerHTML =
+    `<svg viewBox="0 0 ${W} ${H2}" width="100%" height="${H2}" role="img" aria-label="${esc(`${areaLabel} ${dealLabel} 실거래 분포와 현재 호가 비교`)}">${anim}${parts.join("")}</svg>` +
+    `<div class="sheet-tip" hidden></div>`;
+
+  bindSheetHover(host, { months, proj, X, Y, plotTop, volBottom, padL, plotRight, W, H2, askMid, tActual });
+}
+
+/* 호버 층 — 마우스는 날짜를 겨냥하지, 2px 선을 겨냥하지 않는다.
+   그래서 가장 가까운 '달'로 스냅하고 그 달의 모든 수치를 한 번에 보여준다. */
+function bindSheetHover(host, ctx) {
+  const svg = host.querySelector("svg");
+  const tip = host.querySelector(".sheet-tip");
+  const cross = svg?.querySelector(".s-cross");
+  if (!svg || !tip || !cross) return;
+  const line = cross.querySelector("line");
+  const stops = [
+    ...ctx.months.map(m => ({ kind: "real", t: new Date(`${m.month}-15T00:00:00`).getTime(), m })),
+    ...(ctx.proj ? ctx.proj.points.map(p => ({ kind: "proj", t: p.time, p })) : []),
+  ];
+  if (!stops.length) return;
+
+  const hide = () => { cross.setAttribute("opacity", "0"); tip.hidden = true; };
+  const move = event => {
+    const box = svg.getBoundingClientRect();
+    const scale = ctx.W / box.width;
+    const x = (event.clientX - box.left) * scale;
+    if (x < ctx.padL - 12 || x > ctx.plotRight + 12) return hide();
+    let best = stops[0], bestD = Infinity;
+    stops.forEach(s => { const d = Math.abs(ctx.X(s.t) - x); if (d < bestD) { bestD = d; best = s; } });
+    const cx = ctx.X(best.t);
+    line.setAttribute("x1", cx.toFixed(1));
+    line.setAttribute("x2", cx.toFixed(1));
+    cross.setAttribute("opacity", "1");
+
+    const rows = [];
+    let head;
+    if (best.kind === "real") {
+      const m = best.m;
+      head = `${m.month.replace("-", ".")} · 실거래 ${m.n}건`;
+      rows.push(["중앙값", formatShortMoney(m.mid), SHEET.teal]);
+      rows.push(["최저–최고", `${formatShortMoney(m.min)} ~ ${formatShortMoney(m.max)}`, SHEET.teal2]);
+    } else {
+      const p = best.p;
+      head = `${p.month.replace("-", ".")} · 추세 연장 (자료 아님)`;
+      rows.push(["중심선", formatShortMoney(p.mid), SHEET.teal]);
+      rows.push(["구간", `${formatShortMoney(p.lo)} ~ ${formatShortMoney(p.hi)}`, SHEET.teal2]);
+    }
+    if (ctx.askMid != null) rows.push(["현재 중간 호가", formatShortMoney(ctx.askMid), SHEET.orange]);
+
+    tip.textContent = "";
+    const h = document.createElement("strong");
+    h.textContent = head;                    // 라벨은 자료다 — textContent 로만 넣는다
+    tip.appendChild(h);
+    rows.forEach(([label, value, color]) => {
+      const row = document.createElement("div");
+      const key = document.createElement("i"); key.style.background = color;
+      const name = document.createElement("span"); name.textContent = label;
+      const val = document.createElement("b"); val.textContent = value;
+      row.append(key, name, val); tip.appendChild(row);
+    });
+    tip.hidden = false;
+
+    const left = cx / scale;
+    const flip = left > box.width * 0.58;
+    tip.style.left = `${Math.max(6, Math.min(box.width - 12, left + (flip ? -12 : 12)))}px`;
+    tip.style.transform = flip ? "translateX(-100%)" : "none";
+    tip.style.top = `${Math.max(4, (ctx.plotTop + 6) / scale)}px`;
+  };
+
+  svg.addEventListener("pointermove", move);
+  svg.addEventListener("pointerleave", hide);
+  svg.addEventListener("pointerdown", move);
 }
 
 async function exportSheetImage() {
@@ -373,7 +618,12 @@ async function exportSheetImage() {
   try {
     const box = svg.viewBox.baseVal;
     const scale = 2;
-    const source = new XMLSerializer().serializeToString(svg);
+    /* 애니메이션 CSS 가 붙은 채로 직렬화하면 PNG 가 0프레임(투명한 상태)으로 찍힌다.
+       복제본에서 style 을 떼고 내보낸다. */
+    const clone = svg.cloneNode(true);
+    clone.querySelectorAll("style[data-anim]").forEach(node => node.remove());
+    clone.querySelectorAll(".s-cross").forEach(node => node.remove());
+    const source = new XMLSerializer().serializeToString(clone);
     const url = URL.createObjectURL(new Blob([source], { type: "image/svg+xml;charset=utf-8" }));
     const img = new Image();
     await new Promise((ok, fail) => { img.onload = ok; img.onerror = fail; img.src = url; });
@@ -551,8 +801,15 @@ function renderPersistentGone() {
   $("#persistentGone").innerHTML = persistent.length ? `<div class="table-wrap"><table><thead><tr><th>마지막 확인</th><th>동·타입</th><th>높이</th><th>마지막 호가</th></tr></thead><tbody>${persistent.map(item=>`<tr><td>${item.goneOn}</td><td>${esc(item.dong)}동 · ${esc(item.type)}</td><td>${item.floor?`${item.floor}층`:`${esc(item.band)}층`}</td><td class="amount">${esc(listingPrice(item))}</td></tr>`).join("")}</tbody></table></div>` : emptyState("지속 소멸 후보가 없습니다", snapshots.length<3?"후속 스냅샷이 더 쌓여야 지속 여부를 판단할 수 있습니다.":"현재 조건에서는 모두 재등장했거나 최근 소멸 후보입니다.");
 }
 
+/* 진입 애니메이션은 처음 한 번만. 필터를 누를 때마다 카드가 튀어 오르면
+   비교하려던 숫자가 매번 도망간다 — 화려함이 유용성을 깎는 지점이다. */
+let firstPaint = true;
 function renderAll() {
   renderHero(); renderSummary(); renderTransactions(); renderListings(); renderTrends(); renderChanges();
+  if (firstPaint) {
+    firstPaint = false;
+    setTimeout(() => document.body.classList.add("no-anim"), 900);
+  }
 }
 function setTab(tab) {
   const valid = ["summary","transactions","listings","trends","changes"];

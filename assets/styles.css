@@ -29,8 +29,20 @@ button,select,input{font:inherit;color:inherit}button,a,select{touch-action:mani
 .sheet-card{padding-bottom:14px}
 .sheet{position:relative;min-height:300px}
 .sheet svg{width:100%;height:auto;display:block;border-radius:12px}
-.sheet circle{transition:none}
-.sheet circle[fill-opacity]:hover{fill-opacity:.95}
+.sheet svg{touch-action:pan-y}
+/* 호버 판독기 — 값이 굵고 이름이 흐리다. 범례와 위계가 반대인데,
+   여기선 읽는 사람이 이미 어느 계열인지 알고 숫자를 원하기 때문이다. */
+.sheet-tip{position:absolute;z-index:4;pointer-events:none;min-width:150px;
+  padding:9px 11px;border-radius:10px;background:rgba(255,255,255,.97);
+  border:1px solid #dbe6e5;box-shadow:0 8px 24px rgba(18,36,45,.13);
+  font-size:11.5px;line-height:1.45;color:#12242d}
+.sheet-tip strong{display:block;font-size:11px;font-weight:700;color:#6f8189;
+  margin-bottom:5px;letter-spacing:.01em}
+.sheet-tip div{display:flex;align-items:center;gap:6px;margin-top:2px}
+.sheet-tip i{flex:0 0 auto;width:12px;height:2.5px;border-radius:2px}
+.sheet-tip span{flex:1 1 auto;color:#6f8189;white-space:nowrap}
+.sheet-tip b{font-variant-numeric:tabular-nums;font-weight:800}
+@media(hover:none){.sheet-tip{font-size:11px;min-width:130px}}
 .mix-stack{display:flex;height:16px;border-radius:999px;overflow:hidden;background:#edf2f2;margin-bottom:16px}
 .mix-stack span{display:block;height:100%}
 .mix-legend{display:grid;gap:10px}
@@ -54,3 +66,20 @@ button,select,input{font:inherit;color:inherit}button,a,select{touch-action:mani
   .sheet{min-height:0}
   .sheet-card{padding-bottom:12px}
 }
+
+/* 진입 애니메이션 — 값이 자리를 잡는 걸 보여주되, 읽기를 기다리게 하지 않는다.
+   0.4초 안에 끝나고, 움직임을 줄여달라는 설정이면 아예 실행하지 않는다. */
+@media(prefers-reduced-motion:no-preference){
+  .kpi{animation:kRise .42s cubic-bezier(.22,.61,.36,1) both}
+  .kpi:nth-child(2){animation-delay:.05s}
+  .kpi:nth-child(3){animation-delay:.1s}
+  .kpi:nth-child(4){animation-delay:.15s}
+  .mix-stack span{transform-origin:left center;animation:kGrow .5s cubic-bezier(.22,.61,.36,1) both}
+  .signal{animation:kRise .42s cubic-bezier(.22,.61,.36,1) both}
+  .signal:nth-child(2){animation-delay:.06s}
+  .signal:nth-child(3){animation-delay:.12s}
+  @keyframes kRise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+  @keyframes kGrow{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+}
+/* 필터를 바꾸면 카드가 다시 튀어 오르지 않게 — 애니메이션은 첫 진입에만 의미가 있다. */
+.no-anim .kpi,.no-anim .signal,.no-anim .mix-stack span{animation:none}

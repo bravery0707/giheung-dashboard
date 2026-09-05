@@ -44,9 +44,23 @@ const shortDate = value => {
 const kstToday = () => new Intl.DateTimeFormat("en-CA", {
   timeZone: "Asia/Seoul", year: "numeric", month: "2-digit", day: "2-digit",
 }).format(new Date());
+/* 중개소 상호에서 전화번호만 지운다. 상호는 남긴다 —
+   어느 사무소가 올렸는지는 중복 게시를 묶는 데 필요한 정보이기 때문이다.
+   숫자를 무조건 지우면 "1번출구", "2차", "3단지" 같은 상호가 깨지므로
+   '전화번호 모양'일 때만 지운다. GitHub Pages 는 저장소가 private 이어도
+   항상 공개라, 여기서 거른 것이 곧 공개 웹에 안 올라가는 것이다. */
 const phoneFree = value => clean(value)
-  .replace(/\(?0\d{1,2}[-\s)]?\d{3,4}[-\s]\d{4}\)?/g, "")
-  .replace(/\(\s*\)/g, "").trim();
+  // (031) 284 1344 — 괄호가 지역번호만 감싼 형태
+  .replace(/[(（]\s*0\d{1,2}\s*[)）][\s.\-]?\d{3,4}[\s.\-]?\d{4}/g, "")
+  // (031-284-1344), (274-8945) — 괄호 안이 사실상 번호뿐
+  .replace(/[(（][\s\d.\-‒–—~]{6,}[)）]/g, "")
+  // 031-284-1344, 010.1234.5678, 0507 1234 5678
+  .replace(/0\d{1,2}[-.\s]?\d{3,4}[-.\s]?\d{4}/g, "")
+  // 274-8945, 1588-7777 — 국번만 남은 형태
+  .replace(/(?<!\d)\d{3,4}[-.]\d{4}(?!\d)/g, "")
+  .replace(/[(（]\s*[)）]/g, "")
+  .replace(/\s{2,}/g, " ")
+  .trim();
 
 function unzipEntries(buffer) {
   const bytes = new Uint8Array(buffer);

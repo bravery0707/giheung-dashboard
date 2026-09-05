@@ -15,7 +15,7 @@
  * 브라우저에서 직접 부르지 않는 이유: apis.data.go.kr 이 CORS 헤더를 주지 않아
  * GitHub Pages 같은 정적 호스팅에서는 fetch 가 차단된다. 수집은 여기서, 페이지는 JSON만 읽는다.
  */
-import { writeFile, mkdir } from "node:fs/promises";
+import { writeFile, readFile, mkdir } from "node:fs/promises";
 import { get as httpsGet } from "node:https";
 import { setDefaultResultOrder } from "node:dns";
 import { XMLParser } from "./tiny-xml.mjs";
@@ -39,6 +39,18 @@ const LAWD_CD  = process.env.LAWD_CD  || "41463";           // 용인시 기흥�
 const APT_NAME = process.env.APT_NAME || "힐스테이트기흥";   // 신고 원문 표기(공백 없음)
 const MONTHS   = Number(argv("--months", 24));
 const CHECK    = process.argv.includes("--check");   // API 3종 등록 여부만 점검
+
+/* ── 실패 폭주 방지 ────────────────────────────────────────────────
+   예약 실행이 4시간 59분 돌다가 죽은 적이 있다. 원인은 단순하다.
+   포털이 새벽에 응답을 안 주면 요청마다 60초 타임아웃 → 4회 시도 →
+   36개월 × 2개 API = 4.98시간. 재시도 로직이 장애를 5시간짜리 작업으로 키운 것이다.
+   그래서 세 겹으로 막는다: 짧은 요청 타임아웃, 연속 실패 시 그 소스 포기, 전체 데드라인. */
+const REQ_TIMEOUT_MS   = Number(process.env.REQ_TIMEOUT_MS || 20_000);
+const MAX_ATTEMPTS     = 3;    // 최초 1 + 재시도 2
+const FAIL_STREAK_STOP = 4;    // 연속 실패가 이만큼이면 그 API는 포기
+const DEADLINE_MIN     = Number(argv("--deadline", 15));
+const startedAt        = Date.now();
+const outOfTime        = () => (Date.now() - startedAt) > DEADLINE_MIN * 60_000;
 
 const BASE = process.env.DATA_GO_KR_BASE || "https://apis.data.go.kr/1613000";  // 테스트용 오버라이드
 const SOURCES = [
@@ -76,7 +88,7 @@ function requestText(url) {
   return new Promise((resolve, reject) => {
     const req = httpsGet(url, {
       family: 4,
-      signal: AbortSignal.timeout(60_000),
+      signal: AbortSignal.timeout(REQ_TIMEOUT_MS),
       headers: {
         accept: "application/xml",
         "user-agent": "giheung-dashboard/1.0",
@@ -135,7 +147,11 @@ async function fetchMonth(src, ym, attempt = 0) {
   try { items = await call(src, ym); }
   catch (e) {
     if (e.notRegistered) throw e;
-    if (attempt < 3) { await sleep(1500 * (attempt + 1)); return fetchMonth(src, ym, attempt + 1); }
+    // 데드라인이 지났으면 재시도하지 않는다 — 재시도가 장애를 몇 시간짜리로 키우는 걸 막는다.
+    if (attempt < MAX_ATTEMPTS - 1 && !outOfTime()) {
+      await sleep(1200 * (attempt + 1));
+      return fetchMonth(src, ym, attempt + 1);
+    }
     throw new Error(`${src.kind} ${ym} 실패 — ${e.message}`);
   }
   return items.map(it => {
@@ -194,12 +210,18 @@ async function checkOnly() {
 
   for (const src of SOURCES) {
     if (doneGroups.has(src.group)) continue;   // 매매는 상세가 되면 기본은 건너뜀
-    let registered = true, got = 0;
+    let registered = true, got = 0, failStreak = 0;
     for (const ym of months) {
+      if (outOfTime()) {
+        const msg = `· ${src.label} — ${DEADLINE_MIN}분 데드라인 도달, 남은 달은 건너뜁니다 (${ym}부터)`;
+        console.log(msg); problems.push(msg);
+        break;
+      }
       try {
         const rows = await fetchMonth(src, ym);
         const mine = rows.filter(r => norm(r.apt).includes(norm(APT_NAME)));
         all.push(...mine); got += mine.length;
+        failStreak = 0;
         process.stdout.write(`${src.key} ${ym}: ${mine.length}/${rows.length}\n`);
       } catch (e) {
         if (e.notRegistered) {
@@ -210,10 +232,22 @@ async function checkOnly() {
         }
         problems.push(e.message);
         process.stdout.write(`${e.message}\n`);
+        // 연속으로 계속 실패하면 포털 장애로 보고 이 소스는 포기한다.
+        if (++failStreak >= FAIL_STREAK_STOP) {
+          const msg = `· ${src.label} — 연속 ${failStreak}회 실패, 포털 장애로 보고 중단합니다`;
+          console.log(msg); problems.push(msg);
+          break;
+        }
       }
       await sleep(120); // 포털 초당 호출 제한 여유
     }
-    if (registered) { used.push(src.label); doneGroups.add(src.group); console.log(`· ${src.label} — ${got}건`); }
+    // 0건이면 대체 소스를 막지 않는다. 상세 자료가 포털 장애로 못 가져왔을 때
+    // 기본 매매 자료로 넘어갈 수 있어야 한다.
+    if (registered) {
+      used.push(src.label);
+      if (got > 0) doneGroups.add(src.group);
+      console.log(`· ${src.label} — ${got}건`);
+    }
   }
 
   const seen = new Set();
@@ -227,8 +261,26 @@ async function checkOnly() {
     .sort((a, b) => b.date.localeCompare(a.date));
 
   if (!rows.length) {
-    console.error("\n수집된 거래가 0건입니다. 인증키 또는 APT_NAME 표기를 확인하세요.");
+    /* 0건이라고 무조건 실패로 끝내지 않는다.
+       새벽 포털 장애로 한 번 못 받아온 것과, 인증키가 죽은 것은 대응이 다르다.
+       기존 data/transactions.json 이 멀쩡하면 그대로 두고 경고만 남긴다 —
+       매일 아침 실패 메일이 날아오는 것보다, 로그에 남고 다음 실행에 회복되는 편이 낫다. */
+    const keyProblem = skipped.length === SOURCES.length;
+    let hasExisting = false;
+    try {
+      const prev = JSON.parse(await readFile(new URL("../data/transactions.json", import.meta.url), "utf8"));
+      hasExisting = Array.isArray(prev.transactions) && prev.transactions.length > 0;
+    } catch { /* 파일이 없으면 그대로 실패 처리 */ }
+
     if (problems.length) console.error(problems.slice(0, 5).join("\n"));
+
+    if (!keyProblem && hasExisting) {
+      console.log("::warning::포털에서 거래를 못 받아왔습니다. 기존 data/transactions.json 을 그대로 둡니다.");
+      console.log("일시적 장애면 다음 실행에서 회복됩니다. 며칠 이어지면 'node scripts/update.mjs --check' 로 인증키를 점검하세요.");
+      process.exit(0);
+    }
+
+    console.error("\n수집된 거래가 0건입니다. 인증키 또는 APT_NAME 표기를 확인하세요.");
     process.exit(2);
   }
 
