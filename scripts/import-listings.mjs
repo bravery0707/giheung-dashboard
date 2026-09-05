@@ -8,8 +8,11 @@
  * 엑셀의 대표 행과 ↳ 중개소 중복 게시를 한 매물로 묶는다. 이전 스냅샷과는
  * 동·거래·타입·층·향·중개소 겹침을 함께 비교해 신규/소멸 후보/가격변동을 기록한다.
  */
-import { createHash } from "node:crypto";
-import { readFile, writeFile, mkdir } from "node:fs/promises";
+import { resolve, join } from "node:path";
+import { fileURLToPath } from "node:url";
+import { validateEnvelope, mergeSnapshot, COMPLEX, SCOPE } from "./listing-model.mjs";
+import { readOptionalJson, saveCollection, saveFailure } from "./listing-storage.mjs";
+import { readFile } from "node:fs/promises";
 import { inflateRawSync } from "node:zlib";
 
 const input = process.argv[2];
@@ -23,8 +26,6 @@ const arg = (flag, fallback = "") => {
   const i = process.argv.indexOf(flag);
   return i >= 0 && process.argv[i + 1] ? process.argv[i + 1] : fallback;
 };
-const historyPath = new URL("../data/listing-history.json", import.meta.url);
-const outputPath = new URL("../data/listings.json", import.meta.url);
 const clean = value => String(value ?? "").replace(/\s+/g, " ").trim();
 const unescapeXml = value => String(value ?? "")
   .replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"')
@@ -196,130 +197,34 @@ function parseRows(rows) {
   return listings;
 }
 
-const digest = value => createHash("sha1").update(value).digest("hex").slice(0, 10).toUpperCase();
-const baseKey = item => [item.deal, item.dong, item.type, item.area, item.band, item.floor ?? "", item.face].join("|");
-const agentSet = item => new Set((item.agents || []).map(agent => clean(agent.name || agent.agent).replace(/\s/g, "")).filter(Boolean));
-function similarity(previous, current) {
-  if (previous.deal !== current.deal || previous.dong !== current.dong || previous.type !== current.type) return -Infinity;
-  let score = 5;
-  if (previous.area === current.area) score += 2;
-  if (previous.floor != null && current.floor != null && previous.floor === current.floor) score += 8;
-  else if (previous.band && previous.band === current.band) score += 3;
-  if (previous.face && previous.face === current.face) score += 2;
-  const oldAgents = agentSet(previous);
-  for (const agent of agentSet(current)) if (oldAgents.has(agent)) score += 4;
-  const gap = Math.abs((previous.price || 0) - (current.price || 0));
-  if (gap === 0) score += 3;
-  else if (gap <= 5000) score += 1;
-  return score;
-}
-
-function assignTracking(previous = [], current = []) {
-  const unused = new Set(previous.map((_, index) => index));
-  const usedIds = new Set(previous.map(item => item.trackId).filter(Boolean));
-  const sorted = [...current].sort((a, b) => baseKey(a).localeCompare(baseKey(b)) || a.price - b.price);
-  for (const item of sorted) {
-    let bestIndex = -1;
-    let bestScore = -Infinity;
-    for (const index of unused) {
-      const score = similarity(previous[index], item);
-      if (score > bestScore) { bestScore = score; bestIndex = index; }
-    }
-    if (bestIndex >= 0 && bestScore >= 8) {
-      item.trackId = previous[bestIndex].trackId;
-      unused.delete(bestIndex);
-    } else {
-      const root = `HG-${digest(baseKey(item))}`;
-      let id = root;
-      let suffix = 2;
-      while (usedIds.has(id)) id = `${root}-${suffix++}`;
-      item.trackId = id;
-      usedIds.add(id);
-    }
+// Legacy files have no trustworthy collection timestamp. Require an explicit survey date.
+const directory = resolve(arg("--data-dir", fileURLToPath(new URL("../data/", import.meta.url))));
+try {
+  const history = await readOptionalJson(join(directory, "listing-history.json"), null);
+  let payload;
+  if (/\.json$/i.test(input)) payload = JSON.parse(await readFile(input, "utf8"));
+  else payload = { listings: parseRows(xlsxRows(await readFile(input))) };
+  if (payload.schemaVersion !== 2) {
+    const date = arg("--date", bootstrap ? payload.updated || "" : "");
+    if (!date) throw new Error("엑셀·구형 JSON에는 --date YYYY-MM-DD로 실제 조사일을 지정해야 합니다.");
+    const listings = Array.isArray(payload) ? payload : payload.listings;
+    if (!Array.isArray(listings) || !listings.length) throw new Error("구형 파일에서 유효한 매물을 읽지 못했습니다.");
+    payload = { schemaVersion: 2, complex: COMPLEX, scope: SCOPE, source: "legacy-excel",
+      date, capturedAt: null, quality: { complete: true, expectedPages: 1, pagesFetched: 1,
+        expectedUnique: listings.length, expectedPostings: listings.reduce((n, x) => n + (x.count || 1), 0) }, listings };
+  } else if (arg("--date") && arg("--date") !== payload.date) {
+    throw new Error("입력 JSON 조사일과 --date가 다릅니다.");
   }
-  return current;
+  const previous = history?.snapshots?.filter(s => s.date < payload.date).at(-1);
+  const sameDate = history?.snapshots?.find(s => s.date === payload.date);
+  if (sameDate && !process.argv.includes("--replace-date")) throw new Error("같은 조사일이 이미 있습니다. 교체하려면 --replace-date를 지정하세요.");
+  const snapshot = validateEnvelope(payload, { previous, acceptCountDrop: process.argv.includes("--accept-count-drop") });
+  const result = mergeSnapshot(history, snapshot);
+  await saveCollection(directory, result);
+  console.log(`매물 ${result.listings.unique}건 / 게시 ${result.listings.postings}건 / 조사 ${result.listings.updated}`);
+  console.log(`스냅샷 ${result.history.snapshots.length}회 / 변동 ${result.history.changes.length}구간`);
+} catch (error) {
+  await saveFailure(directory);
+  console.error(error.message);
+  process.exitCode = 1;
 }
-
-const median = values => {
-  const sorted = values.filter(Number.isFinite).sort((a, b) => a - b);
-  if (!sorted.length) return null;
-  const middle = Math.floor(sorted.length / 2);
-  return sorted.length % 2 ? sorted[middle] : Math.round((sorted[middle - 1] + sorted[middle]) / 2);
-};
-function makeSnapshot(date, listings) {
-  const sales = listings.filter(item => item.deal === "매매");
-  const medians = {};
-  for (const area of [...new Set(sales.map(item => item.area))]) medians[area] = median(sales.filter(item => item.area === area).map(item => item.price));
-  return {
-    date, unique: listings.length, postings: listings.reduce((sum, item) => sum + (item.count || 1), 0),
-    counts: { total: listings.length, sale: sales.length,
-      jeonse: listings.filter(item => item.deal === "전세").length,
-      monthly: listings.filter(item => item.deal === "월세").length },
-    medianSaleByArea: medians,
-    listings: listings.map(item => ({
-      id: item.id, trackId: item.trackId, dong: item.dong, deal: item.deal,
-      priceText: item.priceText, price: item.price, priceMax: item.priceMax, rent: item.rent,
-      type: item.type, area: item.area, py: item.py, floor: item.floor, band: item.band,
-      face: item.face, listed: item.listed, first: item.first, last: item.last,
-      count: item.count,
-      agents: (item.agents || []).map(agent => ({ name: agent.name || agent.agent })).filter(agent => agent.name),
-    })),
-  };
-}
-function changeBetween(before, after) {
-  const oldMap = new Map(before.listings.map(item => [item.trackId, item]));
-  const newMap = new Map(after.listings.map(item => [item.trackId, item]));
-  const added = after.listings.filter(item => !oldMap.has(item.trackId));
-  const gone = before.listings.filter(item => !newMap.has(item.trackId));
-  const priceChanges = after.listings.flatMap(item => {
-    const old = oldMap.get(item.trackId);
-    if (!old || old.price === item.price && old.priceMax === item.priceMax && old.rent === item.rent) return [];
-    return [{ ...item, beforePrice: old.price, beforePriceMax: old.priceMax, beforeRent: old.rent,
-      afterPrice: item.price, afterPriceMax: item.priceMax, afterRent: item.rent }];
-  });
-  return { from: before.date, to: after.date,
-    summary: { before: before.unique, after: after.unique, new: added.length, gone: gone.length, priceChanges: priceChanges.length },
-    new: added, gone, priceChanges };
-}
-
-async function readJsonSafe(url, fallback) {
-  try { return JSON.parse(await readFile(url, "utf8")); } catch { return fallback; }
-}
-
-let listings;
-if (/\.json$/i.test(input)) {
-  const payload = JSON.parse(await readFile(input, "utf8"));
-  listings = payload.listings || payload;
-} else {
-  listings = parseRows(xlsxRows(await readFile(input)));
-}
-if (!Array.isArray(listings) || !listings.length) throw new Error("매물 배열이 비어 있습니다.");
-
-const existing = await readJsonSafe(historyPath, { version: 1, complex: "힐스테이트기흥", snapshots: [], changes: [] });
-const inferredDate = listings.map(item => isoDate(item.last || item.listed)).filter(Boolean).sort().at(-1);
-const date = arg("--date", inferredDate || kstToday());
-let snapshots = (existing.snapshots || []).filter(snapshot => snapshot.date !== date).sort((a, b) => a.date.localeCompare(b.date));
-const previous = snapshots.at(-1)?.listings || [];
-assignTracking(previous, listings);
-snapshots.push(makeSnapshot(date, listings));
-snapshots = snapshots.sort((a, b) => a.date.localeCompare(b.date)).slice(-180);
-
-// 같은 날짜를 교체했거나 과거 스냅샷을 넣어도 추적과 변화가 일관되도록 순서대로 다시 매칭한다.
-for (let i = 0; i < snapshots.length; i++) {
-  assignTracking(i ? snapshots[i - 1].listings : [], snapshots[i].listings);
-  snapshots[i] = makeSnapshot(snapshots[i].date, snapshots[i].listings);
-}
-const changes = snapshots.slice(1).map((snapshot, index) => changeBetween(snapshots[index], snapshot));
-const latest = snapshots.at(-1);
-const listingsPayload = {
-  updated: latest.date, source: "네이버 부동산 엑셀", complex: "힐스테이트기흥",
-  unique: latest.unique, postings: latest.postings, listings: latest.listings,
-};
-const historyPayload = { version: 1, updated: latest.date, complex: "힐스테이트기흥", snapshots, changes };
-
-await mkdir(new URL("../data/", import.meta.url), { recursive: true });
-await writeFile(outputPath, JSON.stringify(listingsPayload, null, 1) + "\n", "utf8");
-await writeFile(historyPath, JSON.stringify(historyPayload, null, 1) + "\n", "utf8");
-console.log(`data/listings.json — 고유 ${latest.unique}건 / 중개소 게시 ${latest.postings}건 (${latest.date})`);
-console.log(`data/listing-history.json — 스냅샷 ${snapshots.length}회 / 변동 ${changes.length}구간`);
-if (bootstrap) console.log("초기 스냅샷만 만들었습니다. 다음 날짜 엑셀부터 신규·소멸 후보·가격변동이 계산됩니다.");

@@ -1,9 +1,10 @@
+import { persistentGone } from './listing-history.mjs';
 const $ = selector => document.querySelector(selector);
 const $$ = selector => [...document.querySelectorAll(selector)];
 const esc = value => String(value ?? "").replace(/[&<>'"]/g, ch => ({"&":"&amp;","<":"&lt;",">":"&gt;","'":"&#39;",'"':"&quot;"}[ch]));
 const state = {
   transactions: [], transactionMeta: {}, listings: [], listingMeta: {},
-  history: { snapshots: [], changes: [] },
+  history: { snapshots: [], changes: [] }, collection: {},
   filter: { deal: "매매", area: "84", period: 36, band: "all" },
   openListing: "", listingQuery: "", transactionQuery: "", selectedTransaction: null,
 };
@@ -81,16 +82,18 @@ async function loadData(userInitiated = false) {
   button.disabled = true;
   try {
     const version = Date.now();
-    const [tx, listings, history] = await Promise.all([
+    const [tx, listings, history, collection] = await Promise.all([
       fetchJson("./data/transactions.json", version),
       fetchJson("./data/listings.json", version),
       fetchJson("./data/listing-history.json", version).catch(() => ({ snapshots: [], changes: [] })),
+      fetchJson("./data/collection-status.json", version).catch(() => ({ status: 'unknown' })),
     ]);
     state.transactions = tx.transactions || [];
     state.transactionMeta = tx;
     state.listings = listings.listings || [];
     state.listingMeta = listings;
     state.history = history;
+    state.collection = collection;
     $("#syncStamp").textContent = `실거래 ${String(tx.updated || "").replace(" UTC", "")} · 매물 ${listings.updated || "-"}`;
     renderAll();
     if (userInitiated) toast("GitHub에 저장된 최신 데이터를 불러왔습니다.");
@@ -655,7 +658,7 @@ function renderSummary() {
   const gap = askMedian && latestAmount ? (askMedian / latestAmount - 1) * 100 : null;
   $("#summaryKpis").innerHTML = [
     kpi("최근 실거래", latest ? transactionPrice(latest) : "-", latest ? `${latest.date} · ${latest.floor}층` : "조건에 맞는 거래 없음"),
-    kpi("현재 고유 매물", `${formatNumber(listings.length)}<small>건</small>`, `중개소 게시 ${formatNumber(listings.reduce((sum,item)=>sum+(item.count||1),0))}건`),
+    kpi("현재 대표 매물", `${formatNumber(listings.length)}<small>건</small>`, `중개소 게시 ${formatNumber(listings.reduce((sum,item)=>sum+(item.count||1),0))}건`),
     kpi("중간 호가", askMedian ? formatShortMoney(askMedian) : "-", asks.length ? `범위 ${formatShortMoney(Math.min(...asks))}~${formatShortMoney(Math.max(...asks))}` : "조건에 맞는 매물 없음"),
     kpi("호가 − 최근 실거래", gap == null ? "-" : `${gap >= 0 ? "+" : ""}${gap.toFixed(1)}<small>%</small>`, "중간 호가와 최근 신고가 비교", gap > 0 ? "up" : gap < 0 ? "down" : ""),
   ].join("");
@@ -671,12 +674,12 @@ function renderSummary() {
         ${counts.filter(i=>i.count).map(i=>`<span style="width:${(i.count/total*100).toFixed(2)}%;background:${tone[i.deal]}" title="${i.deal} ${i.count}건"></span>`).join("")}
        </div>
        <div class="mix-legend">${counts.map(i=>`<div class="mix-item"><i style="background:${tone[i.deal]}"></i><span>${i.deal}</span><strong>${i.count}</strong><small>${total?Math.round(i.count/total*100):0}%</small></div>`).join("")}</div>
-       <p class="mix-note">전체 ${total}건 · 중개소 중복 게시를 묶은 고유 매물 기준</p>`
+       <p class="mix-note">전체 ${total}건 · 중개소 중복 게시를 묶은 대표 매물 기준</p>`
     : emptyState("매물 데이터가 없습니다", "엑셀을 갱신하면 거래유형별 구성이 표시됩니다.");
 
   const change = state.history.changes?.at(-1);
   const events = filteredChange(change);
-  $("#recentSignals").innerHTML = change ? `<div class="signal-strip"><div class="signal new"><span>신규</span><b>${events.new.length}건</b><span>${change.from} → ${change.to}</span></div><div class="signal gone"><span>소멸 후보</span><b>${events.gone.length}건</b><span>재등록 가능성 포함</span></div><div class="signal price"><span>가격변동</span><b>${events.priceChanges.length}건</b><span>동일 매물 추적 기준</span></div></div>` : emptyState("변동 기록을 준비했습니다", "다음 날짜의 엑셀을 갱신하면 신규·소멸 후보·가격변동이 표시됩니다.");
+  $("#recentSignals").innerHTML = change ? `<div class="signal-strip"><div class="signal new"><span>신규</span><b>${events.new.length}건</b><span>${change.from} → ${change.to}</span></div><div class="signal gone"><span>소멸 후보</span><b>${events.gone.length}건</b><span>재등록 가능성 포함</span></div><div class="signal price"><span>가격변동</span><b>${events.priceChanges.length}건</b><span>동일 매물 추적 기준</span></div></div>` : emptyState("변동 기록을 준비했습니다", "다음 조사일의 매물 데이터를 갱신하면 신규·소멸 후보·가격변동이 표시됩니다.");
 }
 
 function renderTransactions() {
@@ -704,11 +707,11 @@ function renderTransactionTable() {
 function renderListings() {
   const rows = filteredListings();
   const prices = rows.map(item=>item.price);
-  $("#listingStamp").textContent = `네이버 부동산 스냅샷 · ${state.listingMeta.updated || "-"} · 전체 고유 ${state.listingMeta.unique || 0}건`;
+  $("#listingStamp").textContent = `매물 조사 · ${state.listingMeta.updated || "-"} · 전체 대표 ${state.listingMeta.unique || 0}건`;
   $("#listingKpis").innerHTML = [
-    kpi("고유 매물", `${rows.length}<small>건</small>`, `${state.filter.deal} · ${state.filter.area === "all" ? "전체" : `${state.filter.area}㎡`}`),
+    kpi("대표 매물", `${rows.length}<small>건</small>`, `${state.filter.deal} · ${state.filter.area === "all" ? "전체" : `${state.filter.area}㎡`}`),
     kpi("중개소 게시", `${rows.reduce((s,item)=>s+(item.count||1),0)}<small>건</small>`, "중복 게시 포함"),
-    kpi("최저 호가", prices.length ? formatShortMoney(Math.min(...prices)) : "-", "고유 매물 기준"),
+    kpi("최저 호가", prices.length ? formatShortMoney(Math.min(...prices)) : "-", "대표 매물 기준"),
     kpi("중간 호가", prices.length ? formatShortMoney(median(prices)) : "-", prices.length ? `최고 ${formatShortMoney(Math.max(...prices))}` : "조건에 맞는 매물 없음"),
   ].join("");
   const bands = ["저","중","고"].map(band=>{ const list=rows.filter(item=>item.band===band); return {band,list,median:median(list.map(item=>item.price))}; });
@@ -720,10 +723,10 @@ function renderListings() {
 function renderListingTable() {
   const query = state.listingQuery.replace(/\s/g, "").toLowerCase();
   const rows = filteredListings().filter(item => {
-    const text = [item.dong,item.type,item.face,item.priceText,...(item.agents||[]).flatMap(agent=>[agent.name,agent.memo])].join("").replace(/\s/g,"").toLowerCase();
+    const text = [item.dong,item.type,item.face,item.priceText,listingPrice(item),...(item.agents||[]).flatMap(agent=>[agent.name,agent.memo])].join("").replace(/\s/g,"").toLowerCase();
     return !query || text.includes(query);
   }).sort((a,b)=>a.price-b.price);
-  $("#listingCount").textContent = `고유 매물 ${rows.length}건`;
+  $("#listingCount").textContent = `대표 매물 ${rows.length}건`;
   $("#listingTable").innerHTML = rows.flatMap(item => {
     const id = item.trackId || item.id;
     const open = state.openListing === id;
@@ -750,25 +753,26 @@ function renderTrends() {
   $("#trendKpis").innerHTML = [
     kpi("스냅샷", `${series.length}<small>회</small>`, series.length>1?`${series[0].date} ~ ${series.at(-1).date}`:"첫 기준일 저장 완료"),
     kpi("현재 매물", `${latest?.listings.length||0}<small>건</small>`, "선택 조건 기준"),
-    kpi("직전 대비", delta==null?"-":`${delta>0?"+":""}${delta}<small>건</small>`, delta==null?"비교할 다음 스냅샷 필요":"고유 매물 증감",delta>0?"up":delta<0?"down":""),
+    kpi("직전 대비", delta==null?"-":`${delta>0?"+":""}${delta}<small>건</small>`, delta==null?"비교할 다음 스냅샷 필요":"대표 매물 증감",delta>0?"up":delta<0?"down":""),
     kpi("현재 중간 호가", latestMedian?formatShortMoney(latestMedian):"-", "선택 조건 기준"),
   ].join("");
-  renderLineChart("#trendCountChart", series.map(item=>({x:item.date,y:item.listings.length,label:`${item.date} ${item.listings.length}건`})), { height:390, yFormat:value=>`${Math.round(value)}건`, emptyTitle:"매물 스냅샷이 없습니다", singleTitle:"첫 스냅샷을 저장했습니다", singleCopy:"다음 날짜의 엑셀을 올리면 일별 추이가 시작됩니다." });
-  $("#snapshotList").innerHTML = [...series].reverse().map(item=>`<div class="snapshot"><strong>${item.date}</strong><span>${item.listings.length}건</span></div>`).join("") || emptyState("기록 없음","엑셀 갱신 후 표시됩니다.");
+  renderLineChart("#trendCountChart", series.map(item=>({x:item.date,y:item.listings.length,label:`${item.date} ${item.listings.length}건`})), { height:390, yFormat:value=>`${Math.round(value)}건`, emptyTitle:"매물 스냅샷이 없습니다", singleTitle:"첫 스냅샷을 저장했습니다", singleCopy:"다음 조사일의 매물 데이터를 올리면 일별 추이가 시작됩니다." });
+  $("#snapshotList").innerHTML = [...series].reverse().map(item=>`<div class="snapshot"><strong>${item.date}</strong><span>${item.listings.length}건</span></div>`).join("") || emptyState("기록 없음","다음 조사 결과가 저장되면 표시됩니다.");
   renderLineChart("#trendPriceChart", series.map(item=>({x:item.date,y:median(item.listings.map(listing=>listing.price)),label:`${item.date} ${formatShortMoney(median(item.listings.map(listing=>listing.price)))}`})), { yFormat:formatShortMoney, height:310, singleTitle:"중간 호가 기준점이 생겼습니다", singleCopy:"다음 날짜부터 가격 흐름이 연결됩니다." });
 }
 
 function filteredChange(change) {
-  if (!change) return { new:[], gone:[], priceChanges:[] };
+  if (!change) return { new:[], gone:[], reappeared:[], priceChanges:[] };
   return {
     new:(change.new||[]).filter(listingMatches),
+    reappeared:(change.reappeared||[]).filter(listingMatches),
     gone:(change.gone||[]).filter(listingMatches),
     priceChanges:(change.priceChanges||[]).filter(listingMatches),
   };
 }
 function eventCards(items, type) {
   if (!items.length) return emptyState(`${type} 매물이 없습니다`, "선택 조건과 비교 기간 기준입니다.");
-  return `<div class="change-cards">${items.map(item=>`<div class="change-card"><span class="event-pill ${type==="신규"?"new":type==="소멸 후보"?"gone":"price"}">${type}</span><div><strong>${esc(item.dong)}동 · ${esc(item.type)} · ${item.floor?`${item.floor}층`:`${esc(item.band)}층`}</strong><br><span>${esc(item.face||"")} · ${esc(item.deal)} · 중개소 게시 ${item.count||1}곳</span></div><div class="change-price">${type==="가격변동"?`${formatShortMoney(item.beforePrice)} → ${formatShortMoney(item.afterPrice)}`:esc(listingPrice(item))}</div></div>`).join("")}</div>`;
+  return `<div class="change-cards">${items.map(item=>`<div class="change-card"><span class="event-pill ${(type==="신규"||type==="재등장")?"new":type==="소멸 후보"?"gone":"price"}">${type}</span><div><strong>${esc(item.dong)}동 · ${esc(item.type)} · ${item.floor?`${item.floor}층`:`${esc(item.band)}층`}</strong><br><span>${esc(item.face||"")} · ${esc(item.deal)} · 중개소 게시 ${item.count||1}곳${item.matchMethod==="attributes"?" · 속성으로 추정":item.matchMethod==="ambiguous"?" · 동일성 미확인":""}</span></div><div class="change-price">${type==="가격변동"?`${esc(listingPrice({...item, price:item.beforePrice, priceMax:item.beforePriceMax, rent:item.beforeRent}))} → ${esc(listingPrice(item))}`:esc(listingPrice(item))}</div></div>`).join("")}</div>`;
 }
 function renderChanges() {
   const changes = state.history.changes || [];
@@ -778,34 +782,41 @@ function renderChanges() {
   if (changes.length) select.value = changes[Number(current)] ? current : String(changes.length-1);
   const change = changes[Number(select.value)] || changes.at(-1);
   const events = filteredChange(change);
-  $("#changeBadge").textContent = change ? events.new.length+events.gone.length+events.priceChanges.length : 0;
+  $("#changeBadge").textContent = change ? events.new.length+events.gone.length+events.priceChanges.length+events.reappeared.length : 0;
   $("#changeKpis").innerHTML = [
     kpi("비교 기간", change?`${change.from.slice(5)} → ${change.to.slice(5)}`:"-", change?"스냅샷 간 비교":"다음 갱신부터 계산"),
     kpi("신규", `${events.new.length}<small>건</small>`, "새 추적 ID", events.new.length?"down":""),
     kpi("소멸 후보", `${events.gone.length}<small>건</small>`, "거래 확정 아님", events.gone.length?"up":""),
     kpi("가격변동", `${events.priceChanges.length}<small>건</small>`, "동일 매물 비교"),
   ].join("");
-  $("#changeContent").innerHTML = change ? `<section class="change-group"><h3>신규 등록</h3>${eventCards(events.new,"신규")}</section><section class="change-group"><h3>소멸 후보</h3>${eventCards(events.gone,"소멸 후보")}</section><section class="change-group"><h3>가격변동</h3>${eventCards(events.priceChanges,"가격변동")}</section>` : emptyState("비교할 매물 스냅샷이 아직 없습니다","다음 날짜의 엑셀을 올리면 신규·소멸 후보·가격변동이 자동 계산됩니다.");
+  $("#changeContent").innerHTML = change ? `<section class="change-group"><h3>신규 등록</h3>${eventCards(events.new,"신규")}</section><section class="change-group"><h3>재등장</h3>${eventCards(events.reappeared,"재등장")}</section><section class="change-group"><h3>소멸 후보</h3>${eventCards(events.gone,"소멸 후보")}</section><section class="change-group"><h3>가격변동</h3>${eventCards(events.priceChanges,"가격변동")}</section>` : emptyState("비교할 매물 스냅샷이 아직 없습니다","다음 조사일의 매물 데이터를 올리면 신규·소멸 후보·가격변동이 자동 계산됩니다.");
   renderPersistentGone();
 }
 function renderPersistentGone() {
   const snapshots = state.history.snapshots || [];
-  const changes = state.history.changes || [];
-  const latestIds = new Set((snapshots.at(-1)?.listings||[]).map(item=>item.trackId));
-  const persistent = [];
-  for (const change of changes) {
-    const laterCount = snapshots.filter(snapshot=>snapshot.date>change.to).length;
-    if (!laterCount) continue;
-    for (const item of change.gone||[]) if (!latestIds.has(item.trackId) && listingMatches(item) && !persistent.some(old=>old.trackId===item.trackId)) persistent.push({...item,goneOn:change.to});
-  }
-  $("#persistentGone").innerHTML = persistent.length ? `<div class="table-wrap"><table><thead><tr><th>마지막 확인</th><th>동·타입</th><th>높이</th><th>마지막 호가</th></tr></thead><tbody>${persistent.map(item=>`<tr><td>${item.goneOn}</td><td>${esc(item.dong)}동 · ${esc(item.type)}</td><td>${item.floor?`${item.floor}층`:`${esc(item.band)}층`}</td><td class="amount">${esc(listingPrice(item))}</td></tr>`).join("")}</tbody></table></div>` : emptyState("지속 소멸 후보가 없습니다", snapshots.length<3?"후속 스냅샷이 더 쌓여야 지속 여부를 판단할 수 있습니다.":"현재 조건에서는 모두 재등장했거나 최근 소멸 후보입니다.");
+  const minimumDays = Number($("#persistentDays").value);
+  const persistent = persistentGone(snapshots).filter(item => listingMatches(item) && item.daysSinceLastSeen >= minimumDays);
+  $("#persistentGone").innerHTML = persistent.length ? `<div class="table-wrap"><table><thead><tr><th>마지막 관측</th><th>미관측 시작</th><th>미관측 조사</th><th>동·타입</th><th>높이</th><th>마지막 호가</th></tr></thead><tbody>${persistent.map(item=>`<tr><td>${esc(item.lastSeen)}</td><td>${esc(item.missingSince)}</td><td>${item.missingObservations}회</td><td>${esc(item.dong)}동 · ${esc(item.type)}</td><td>${item.floor?`${item.floor}층`:`${esc(item.band)}층`}</td><td class="amount">${esc(listingPrice(item))}</td></tr>`).join("")}</tbody></table></div>` : emptyState("조건에 맞는 지속 소멸 후보가 없습니다", "마지막 관측 뒤 정상 조사에서 2회 이상 보이지 않은 매물입니다. 재등장하면 미관측 횟수를 다시 계산합니다.");
+}
+
+function renderCollectionStatus() {
+  const status = state.collection.status || 'unknown';
+  const date = state.listingMeta.updated || "-";
+  const captured = state.listingMeta.capturedAt;
+  const captureLabel = captured ? new Intl.DateTimeFormat("ko-KR", {timeZone:"Asia/Seoul",dateStyle:"medium",timeStyle:"short"}).format(new Date(captured)) : `${date} · 수집 시각 미기록`;
+  const age = Math.floor((Date.now() - Date.parse(captured || `${date}T23:59:59+09:00`)) / 86400000);
+  const message = status === "failed" ? "최근 매물 갱신 실패 · 이전 조사 결과를 표시합니다."
+    : status === "pending" ? "자동 수집 준비 중 · 저장된 조사 결과를 표시합니다."
+    : status === "unknown" ? "수집 상태를 확인할 수 없습니다."
+    : age >= 2 ? `매물 조사가 ${age}일 전 자료입니다.` : "매물 조사 결과가 반영되었습니다.";
+  $("#collectionStatus").textContent = `${message} 마지막 조사: ${captureLabel}`;
 }
 
 /* 진입 애니메이션은 처음 한 번만. 필터를 누를 때마다 카드가 튀어 오르면
    비교하려던 숫자가 매번 도망간다 — 화려함이 유용성을 깎는 지점이다. */
 let firstPaint = true;
 function renderAll() {
-  renderHero(); renderSummary(); renderTransactions(); renderListings(); renderTrends(); renderChanges();
+  renderCollectionStatus(); renderHero(); renderSummary(); renderTransactions(); renderListings(); renderTrends(); renderChanges();
   if (firstPaint) {
     firstPaint = false;
     setTimeout(() => document.body.classList.add("no-anim"), 900);
@@ -837,6 +848,7 @@ function bind() {
   $("#transactionSearch").addEventListener("input",event=>{state.transactionQuery=event.target.value;renderTransactionTable();});
   $("#listingSearch").addEventListener("input",event=>{state.listingQuery=event.target.value;renderListingTable();});
   $("#changePeriod").addEventListener("change",renderChanges);
+  $("#persistentDays").addEventListener("change",renderPersistentGone);
   $$(".subtabs button").forEach(button=>button.addEventListener("click",()=>{
     $$(".subtabs button").forEach(node=>node.classList.toggle("active",node===button));
     $$('[data-transaction-view]').forEach(view=>view.hidden=view.dataset.transactionView!==button.dataset.view);

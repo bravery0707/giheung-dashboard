@@ -1,0 +1,5 @@
+.private/
+node_modules/
+_site/
+*.tmp
+.env*

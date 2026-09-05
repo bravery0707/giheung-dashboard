@@ -1,70 +1,85 @@
 name: 매물 엑셀 반영
-
-# incoming/listings.xlsx 가 푸시되면 자동으로 스냅샷을 쌓는다.
-# 사람이 하는 일은 "엑셀을 그 경로에 넣고 푸시" 한 번뿐이다.
 on:
   push:
-    paths:
-      - "incoming/listings.xlsx"
+    branches: [main]
+    paths: ["incoming/listings.xlsx", "incoming/listings.date.txt", "incoming/listings.json"]
   workflow_dispatch:
     inputs:
       date:
-        description: "스냅샷 날짜 (YYYY-MM-DD, 비우면 엑셀의 최신 등록일자)"
+        description: "엑셀의 실제 조사일 YYYY-MM-DD (JSON은 내부 조사일 사용)"
         default: ""
-
+      replace_date:
+        description: "같은 조사일 교체"
+        type: boolean
+        default: false
+      accept_count_drop:
+        description: "전체 건수 확인 후 급감한 스냅샷 승인"
+        type: boolean
+        default: false
 permissions:
   contents: write
-
-# 실거래 갱신과 동시에 돌면서 서로 push 를 밀어내지 않게 한다.
 concurrency:
   group: data-commit
   cancel-in-progress: false
-
 jobs:
   import:
     runs-on: ubuntu-latest
     steps:
-      - name: 저장소 파일 불러오기
-        uses: actions/checkout@v4
-
-      - name: Node.js 설치
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@v4
         with:
-          node-version: "20"
-
-      - name: 엑셀 확인
-        id: check
+          ref: main
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: 입력 확인
+        id: input
         run: |
-          if [ -f incoming/listings.xlsx ]; then
+          if [ -f incoming/listings.json ] || [ -f incoming/listings.xlsx ]; then
             echo "found=true" >> "$GITHUB_OUTPUT"
-            echo "크기: $(stat -c%s incoming/listings.xlsx) bytes"
           else
             echo "found=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::incoming/listings.xlsx 가 없어 건너뜁니다."
           fi
-
-      - name: 매물 스냅샷 반영
-        if: steps.check.outputs.found == 'true'
+      - name: 조사일과 전체 건수 검증 후 반영
+        if: steps.input.outputs.found == 'true'
+        id: import
+        continue-on-error: true
+        env:
+          SURVEY_DATE: ${{ inputs.date }}
+          REPLACE_DATE: ${{ inputs.replace_date }}
+          ACCEPT_COUNT_DROP: ${{ inputs.accept_count_drop }}
         run: |
-          if [ -n "${{ github.event.inputs.date }}" ]; then
-            node scripts/import-listings.mjs incoming/listings.xlsx --date "${{ github.event.inputs.date }}"
+          args=()
+          if [ "$REPLACE_DATE" = "true" ]; then args+=(--replace-date); fi
+          if [ "$ACCEPT_COUNT_DROP" = "true" ]; then args+=(--accept-count-drop); fi
+          if [ -f incoming/listings.json ] && [ -f incoming/listings.xlsx ]; then
+            node --input-type=module -e "import {saveFailure} from './scripts/listing-storage.mjs'; await saveFailure('data')"
+            echo "::error::JSON과 엑셀 중 하나만 업로드하세요."
+            exit 1
+          elif [ -f incoming/listings.json ]; then
+            node scripts/import-listings.mjs incoming/listings.json "${args[@]}"
           else
-            node scripts/import-listings.mjs incoming/listings.xlsx
+            if [ -z "$SURVEY_DATE" ] && [ -f incoming/listings.date.txt ]; then
+              SURVEY_DATE="$(tr -d '\r\n' < incoming/listings.date.txt)"
+            fi
+            node scripts/import-listings.mjs incoming/listings.xlsx --date "$SURVEY_DATE" "${args[@]}"
           fi
-
-      - name: 원본 엑셀 제거 후 커밋
-        if: steps.check.outputs.found == 'true'
+      - name: 결과 저장
+        if: steps.input.outputs.found == 'true'
+        env:
+          IMPORT_OUTCOME: ${{ steps.import.outcome }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-
-          rm -f incoming/listings.xlsx
-          git add -A data/listings.json data/listing-history.json incoming
-
-          if git diff --cached --quiet; then
-            echo "변경 없음"
-          else
-            git commit -m "chore: 매물 스냅샷 반영 ($(TZ=Asia/Seoul date +%F))"
-            git pull --rebase --autostash origin "${GITHUB_REF_NAME}"
-            git push
+          git add data/collection-status.json
+          if [ "$IMPORT_OUTCOME" = "success" ]; then
+            rm -f incoming/listings.xlsx incoming/listings.json incoming/listings.date.txt
+            git add -A data/listings.json data/listing-history.json incoming
           fi
+          if ! git diff --cached --quiet; then
+            git commit -m "chore: 매물 스냅샷 반영 결과"
+            git pull --rebase --autostash origin main
+            git push origin HEAD:main
+          fi
+      - name: 반영 결과 확인
+        if: steps.import.outcome == 'failure'
+        run: exit 1

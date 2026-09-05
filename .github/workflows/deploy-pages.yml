@@ -1,0 +1,46 @@
+name: 대시보드 배포
+on:
+  push:
+    branches: [main]
+    paths: ["index.html", "assets/**", "data/**", ".github/workflows/deploy-pages.yml"]
+  workflow_run:
+    workflows: ["매물 엑셀 반영", "실거래 데이터 갱신", "허용된 매물 데이터 시험 수집"]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+concurrency:
+  group: pages
+  cancel-in-progress: false
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      # Only trusted default-branch code; never consume PR artifacts.
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: 매물 처리 회귀 검사
+        run: node --test tests/*.test.mjs
+      - name: 공개할 파일만 모으기
+        run: |
+          mkdir -p _site/data
+          cp index.html _site/
+          cp -R assets _site/assets
+          cp data/transactions.json data/listings.json data/listing-history.json data/collection-status.json _site/data/
+          touch _site/.nojekyll
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: _site
+      - uses: actions/deploy-pages@v4
+        id: deployment
