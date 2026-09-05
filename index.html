@@ -105,6 +105,7 @@
     </section>
 
     <section class="panel-page" data-page="listings" hidden>
+      <p class="notice" id="collectionStatus" role="status"></p>
       <div class="section-heading"><div><span class="kicker">NAVER LISTING SNAPSHOT</span><h2>매물 현황</h2></div><p id="listingStamp"></p></div>
       <div class="kpi-grid compact" id="listingKpis"></div>
       <div class="dashboard-grid">
@@ -129,15 +130,16 @@
       <div class="notice"><strong>해석 주의</strong><span>매물 소멸은 계약·매도 완료를 뜻하지 않습니다. 중개사 확인, 실거래 신고와 함께 보아야 합니다.</span></div>
       <div class="kpi-grid compact" id="changeKpis"></div>
       <div id="changeContent"></div>
-      <article class="card persistent-card"><div class="card-title"><div><h3>지속 소멸 후보</h3><p>사라진 뒤 후속 스냅샷에도 다시 나타나지 않은 매물</p></div></div><div id="persistentGone"></div></article>
+      <article class="card persistent-card"><div class="card-title"><div><h3>지속 소멸 후보</h3><p>정상 조사에서 2회 이상 미관측. 수집하지 못한 날은 횟수에 포함하지 않습니다.</p></div><div><label for="persistentDays">마지막 관측 이후 </label><select id="persistentDays"><option value="0">전체</option><option value="3">3일 이상</option><option value="7">7일 이상</option><option value="14">14일 이상</option></select></div></div><div id="persistentGone"></div></article>
     </section>
 
     <section class="automation card">
       <details>
-        <summary><span><strong>매물 엑셀 갱신 방법</strong><small>업로드 한 번으로 JSON 변환·변동 기록</small></span><span>열기</span></summary>
+        <summary><span><strong>매물 데이터 확인 방법</strong><small>조사일·수집 상태·매물 건수</small></span><span>열기</span></summary>
         <div class="automation-body">
-          <ol><li>Edge의 Tampermonkey 버튼으로 힐스테이트 기흥 엑셀을 내려받습니다.</li><li>저장소의 <code>incoming/listings.xlsx</code>에 같은 이름으로 업로드합니다.</li><li>GitHub Actions가 자동으로 매물·변동 JSON을 만들고 원본 엑셀은 현재 브랜치에서 제거합니다.</li></ol>
-          <p>하루 단위 변동이 필요하면 하루 한 번 스냅샷이 필요합니다. PC가 꺼져 있으면 Edge 확장프로그램은 실행되지 않으며, 네이버 내부 API를 GitHub 서버에서 무인 수집하는 방식은 사용하지 않습니다.</p>
+          <p>매물 현황의 마지막 조사일과 수집 상태를 함께 확인하세요. 갱신이 실패하면 이전 조사 결과를 유지합니다.</p>
+          <p>대표 매물은 광고를 묶은 단위이며 실제 주택 수와 다를 수 있습니다. 원본 광고 ID가 바뀐 재등록은 신규로 보일 수 있고, 속성으로 연결한 매물은 추정입니다.</p>
+          <p>범위로 표시된 호가는 최솟값을 대표값으로 집계합니다. 전체 중간 호가의 변화와 동일 매물의 가격변동을 함께 보세요.</p>
         </div>
       </details>
     </section>
