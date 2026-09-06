@@ -18,7 +18,7 @@ export function checkSource(config, address, now = new Date()) {
   if (offset < 0 || offset >= config.trial.days) throw new Error('시험 수집 기간 밖입니다. 결과 검토 후 일정을 설정하세요.');
   return url;
 }
-async function readGuard(directory) {
+export async function readGuard(directory) {
   const state = await readOptionalJson(join(directory, 'request-state.json'), { version: 1, lastAttemptDate: null, halted: false });
   if (state.version !== 1 || typeof state.halted !== 'boolean' || (state.lastAttemptDate !== null && calendarDate(state.lastAttemptDate) !== state.lastAttemptDate)) throw new Error('요청 제한 기록을 확인할 수 없습니다. 수집을 중단합니다.');
   return state;
