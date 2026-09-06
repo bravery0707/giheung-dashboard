@@ -198,8 +198,11 @@ function parseRows(rows) {
 }
 
 // Legacy files have no trustworthy collection timestamp. Require an explicit survey date.
-const directory = resolve(arg("--data-dir", fileURLToPath(new URL("../data/", import.meta.url))));
+const { PRIVATE_DATA, privateDirectory, withDataLock } = await import('./private-storage.mjs');
+const directory = await privateDirectory(resolve(arg("--data-dir", PRIVATE_DATA)));
 try {
+  if (process.env.CI) throw new Error('매물 가져오기는 개인 PC에서 실행하세요.');
+  await withDataLock(directory, async () => {
   const history = await readOptionalJson(join(directory, "listing-history.json"), null);
   let payload;
   if (/\.json$/i.test(input)) payload = JSON.parse(await readFile(input, "utf8"));
@@ -223,8 +226,9 @@ try {
   await saveCollection(directory, result);
   console.log(`매물 ${result.listings.unique}건 / 게시 ${result.listings.postings}건 / 조사 ${result.listings.updated}`);
   console.log(`스냅샷 ${result.history.snapshots.length}회 / 변동 ${result.history.changes.length}구간`);
+  });
 } catch (error) {
-  await saveFailure(directory);
+  if (error.code !== 'LOCKED') await saveFailure(directory);
   console.error(error.message);
   process.exitCode = 1;
 }
