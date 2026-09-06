@@ -1,0 +1,13 @@
+{
+  "name": "giheung-private-dashboard",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "test": "node --test tests/*.test.mjs",
+    "test:browser:offline": "node tests/naver-browser-check.mjs",
+    "collect:naver": "node scripts/collect-naver.mjs",
+    "start": "node scripts/private-dashboard.mjs"
+  },
+  "dependencies": { "playwright": "1.62.1" }
+}
