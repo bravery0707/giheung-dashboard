@@ -7,6 +7,7 @@ import { PUBLIC_DATA, STATIC_FILES, readStatic } from './build-public.mjs';
 import { readOptionalJson } from './listing-storage.mjs';
 import { collect, checkSource } from './collect-listings.mjs';
 import { kstDate } from './listing-model.mjs';
+import { collectNaver, checkNaverConfig, loadNaverConfig, loadChromium } from './collect-naver.mjs';
 
 export function dueAt(now, time = '21:10') {
   if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(time)) throw new Error('예약 시각은 HH:MM 형식입니다.');
@@ -66,7 +67,16 @@ async function main() {
   const directory = resolve(process.env.LISTING_DATA_DIR || PRIVATE_DATA);
   let scheduler;
   // No collection merely from opening or refreshing the dashboard.
-  if (process.argv.includes('--schedule')) {
+  if (process.argv.includes('--schedule-naver')) {
+    if (mode !== 'private' || process.env.CI) throw new Error('예약 수집은 개인 PC의 비공개 모드에서만 가능합니다.');
+    const config = await loadNaverConfig();
+    checkNaverConfig(config);
+    const audit = await readOptionalJson(join(directory, 'naver-audit.json'), null);
+    const latest = await readOptionalJson(join(directory, 'listings.json'), null);
+    if (audit?.pricesVerified !== true || latest?.source !== 'naver-dom-v1' || audit.capturedAt !== latest.capturedAt) throw new Error('실제 네이버 전체 수집 성공 기록을 확인한 뒤 예약을 활성화하세요.');
+    const chromium = await loadChromium();
+    scheduler = startScheduler(now => collectNaver({ config, chromium, directory, now }));
+  } else if (process.argv.includes('--schedule')) {
     if (mode !== 'private' || process.env.CI) throw new Error('예약 수집은 개인 PC의 비공개 모드에서만 가능합니다.');
     const config = JSON.parse(await readFile(process.env.LISTING_CONFIG || join(ROOT, 'config/listing-source.json'), 'utf8'));
     checkSource(config, process.env.LISTING_FEED_URL);
