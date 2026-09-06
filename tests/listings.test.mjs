@@ -147,7 +147,7 @@ test('feed -> validation -> stored JSON works and incomplete result preserves la
   const run = input => collect({ config: approved(), address: 'https://example.com/feed', token: 'test-token', directory, now,
     fetchImpl: async (_url, request) => { options = request; return new Response(JSON.stringify(input), { headers: { 'content-type': 'application/json' } }); } });
   await run(good);
-  assert.equal(options.redirect, 'error');
+  assert.equal(options.redirect, 'manual');
   assert.equal(options.headers.Authorization, 'Bearer test-token');
   const before = await readFile(join(directory, 'listing-history.json'), 'utf8');
   await assert.rejects(run({ ...good, quality: { ...good.quality, complete: false } }));
