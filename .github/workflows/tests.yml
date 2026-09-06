@@ -15,3 +15,4 @@ jobs:
         with:
           node-version: "22"
       - run: node --test tests/*.test.mjs
+      - run: node scripts/build-public.mjs
