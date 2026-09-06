@@ -83,3 +83,7 @@ button,select,input{font:inherit;color:inherit}button,a,select{touch-action:mani
 }
 /* 필터를 바꾸면 카드가 다시 튀어 오르지 않게 — 애니메이션은 첫 진입에만 의미가 있다. */
 .no-anim .kpi,.no-anim .signal,.no-anim .mix-stack span{animation:none}
+.private-notice { display: none; }
+body[data-visibility="public"] .private-notice { display: block; padding: 28px; }
+body[data-visibility="public"] .private-notice p { line-height: 1.8; color: #526576; }
+body[data-visibility="public"] :is([data-page="listings"], [data-page="trends"], [data-page="changes"]) > :not(.private-notice) { display: none; }
