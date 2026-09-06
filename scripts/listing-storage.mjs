@@ -1,5 +1,6 @@
 import { readFile, writeFile, rename, mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
+import { privateDirectory } from './private-storage.mjs';
 
 export async function readOptionalJson(path, fallback) {
   try { return JSON.parse(await readFile(path, 'utf8')); }
@@ -11,6 +12,7 @@ export async function writeJson(path, data) {
   await rename(temporary, path);
 }
 export async function saveCollection(directory, result, checkedAt = new Date().toISOString()) {
+  directory = await privateDirectory(directory);
   await mkdir(directory, { recursive: true });
   await writeJson(join(directory, 'listing-history.json'), result.history);
   await writeJson(join(directory, 'listings.json'), result.listings);
@@ -20,6 +22,7 @@ export async function saveCollection(directory, result, checkedAt = new Date().t
   });
 }
 export async function saveFailure(directory, status = 'failed') {
+  directory = await privateDirectory(directory);
   await mkdir(directory, { recursive: true });
   const latest = await readOptionalJson(join(directory, 'listings.json'), {});
   // Do not publish URLs, tokens, raw HTTP bodies or supplier error text.
