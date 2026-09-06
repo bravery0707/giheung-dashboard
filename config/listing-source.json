@@ -4,7 +4,6 @@
   "allowedOrigin": "",
   "permission": {
     "collection": false,
-    "publicRedistribution": false,
     "reference": ""
   },
   "trial": {
