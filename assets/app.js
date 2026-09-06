@@ -4,7 +4,7 @@ const $$ = selector => [...document.querySelectorAll(selector)];
 const esc = value => String(value ?? "").replace(/[&<>'"]/g, ch => ({"&":"&amp;","<":"&lt;",">":"&gt;","'":"&#39;",'"':"&quot;"}[ch]));
 const state = {
   transactions: [], transactionMeta: {}, listings: [], listingMeta: {},
-  history: { snapshots: [], changes: [] }, collection: {},
+  history: { snapshots: [], changes: [] }, collection: {}, isPrivate: false,
   filter: { deal: "매매", area: "84", period: 36, band: "all" },
   openListing: "", listingQuery: "", transactionQuery: "", selectedTransaction: null,
 };
@@ -82,11 +82,14 @@ async function loadData(userInitiated = false) {
   button.disabled = true;
   try {
     const version = Date.now();
+    const mode = await fetchJson('./data/site-mode.json', version).catch(() => ({ mode: 'public' }));
+    state.isPrivate = mode.mode === 'private' && location.hostname === '127.0.0.1';
+    document.body.dataset.visibility = state.isPrivate ? 'private' : 'public';
     const [tx, listings, history, collection] = await Promise.all([
       fetchJson("./data/transactions.json", version),
-      fetchJson("./data/listings.json", version),
-      fetchJson("./data/listing-history.json", version).catch(() => ({ snapshots: [], changes: [] })),
-      fetchJson("./data/collection-status.json", version).catch(() => ({ status: 'unknown' })),
+      state.isPrivate ? fetchJson("./data/listings.json", version) : { listings: [] },
+      state.isPrivate ? fetchJson("./data/listing-history.json", version) : { snapshots: [], changes: [] },
+      state.isPrivate ? fetchJson("./data/collection-status.json", version) : { status: 'private' },
     ]);
     state.transactions = tx.transactions || [];
     state.transactionMeta = tx;
@@ -94,9 +97,9 @@ async function loadData(userInitiated = false) {
     state.listingMeta = listings;
     state.history = history;
     state.collection = collection;
-    $("#syncStamp").textContent = `실거래 ${String(tx.updated || "").replace(" UTC", "")} · 매물 ${listings.updated || "-"}`;
+    $("#syncStamp").textContent = `실거래 ${String(tx.updated || "").replace(" UTC", "")} · ${state.isPrivate ? `매물 ${listings.updated || '조사 전'}` : '매물 비공개'}`;
     renderAll();
-    if (userInitiated) toast("GitHub에 저장된 최신 데이터를 불러왔습니다.");
+    if (userInitiated) toast("저장된 최신 데이터를 불러왔습니다.");
   } catch (error) {
     console.error(error);
     $("#syncStamp").textContent = "데이터를 불러오지 못함";
@@ -360,7 +363,7 @@ function renderMarketSheet() {
   const stats = [
     ["최근 실거래", latest ? transactionPrice(latest) : "-", latest ? `${latest.date.slice(2)} · ${latest.floor}층` : "해당 없음", null],
     ["최근 3개월 중앙값", recent3 ? formatShortMoney(recent3) : "-", `기간 전체 ${tx.length}건`, null],
-    ["현재 중간 호가", askMid ? formatShortMoney(askMid) : "-", asks.length ? `${asks.length}건` : "매물 없음", null],
+    ["현재 중간 호가", askMid ? formatShortMoney(askMid) : "-", !state.isPrivate ? "개인 PC에서 확인" : asks.length ? `${asks.length}건` : "매물 조사 자료 없음", null],
     ["호가 − 실거래", gap == null ? "-" : `${gap >= 0 ? "+" : ""}${gap.toFixed(1)}%`,
       recent3 ? "최근 3개월 중앙값 대비" : "최근 실거래 대비",
       gap == null ? null : (gap >= 0 ? SHEET.red : SHEET.teal)],
@@ -658,8 +661,8 @@ function renderSummary() {
   const gap = askMedian && latestAmount ? (askMedian / latestAmount - 1) * 100 : null;
   $("#summaryKpis").innerHTML = [
     kpi("최근 실거래", latest ? transactionPrice(latest) : "-", latest ? `${latest.date} · ${latest.floor}층` : "조건에 맞는 거래 없음"),
-    kpi("현재 대표 매물", `${formatNumber(listings.length)}<small>건</small>`, `중개소 게시 ${formatNumber(listings.reduce((sum,item)=>sum+(item.count||1),0))}건`),
-    kpi("중간 호가", askMedian ? formatShortMoney(askMedian) : "-", asks.length ? `범위 ${formatShortMoney(Math.min(...asks))}~${formatShortMoney(Math.max(...asks))}` : "조건에 맞는 매물 없음"),
+    state.isPrivate ? kpi("현재 대표 매물", `${formatNumber(listings.length)}<small>건</small>`, `중개소 게시 ${formatNumber(listings.reduce((sum,item)=>sum+(item.count||1),0))}건`) : kpi("현재 대표 매물", "비공개", "개인 PC에서 확인"),
+    kpi("중간 호가", askMedian ? formatShortMoney(askMedian) : "-", !state.isPrivate ? "개인 PC에서 확인" : asks.length ? `범위 ${formatShortMoney(Math.min(...asks))}~${formatShortMoney(Math.max(...asks))}` : "조건에 맞는 매물 없음"),
     kpi("호가 − 최근 실거래", gap == null ? "-" : `${gap >= 0 ? "+" : ""}${gap.toFixed(1)}<small>%</small>`, "중간 호가와 최근 신고가 비교", gap > 0 ? "up" : gap < 0 ? "down" : ""),
   ].join("");
 
@@ -805,7 +808,8 @@ function renderCollectionStatus() {
   const captured = state.listingMeta.capturedAt;
   const captureLabel = captured ? new Intl.DateTimeFormat("ko-KR", {timeZone:"Asia/Seoul",dateStyle:"medium",timeStyle:"short"}).format(new Date(captured)) : `${date} · 수집 시각 미기록`;
   const age = Math.floor((Date.now() - Date.parse(captured || `${date}T23:59:59+09:00`)) / 86400000);
-  const message = status === "failed" ? "최근 매물 갱신 실패 · 이전 조사 결과를 표시합니다."
+  const message = status === "paused" ? "접근 거부 또는 보안 확인 응답으로 자동 수집 중지 · 원인 확인 후 수동 재개가 필요합니다."
+    : status === "failed" ? "최근 매물 갱신 실패 · 이전 조사 결과를 표시합니다."
     : status === "pending" ? "자동 수집 준비 중 · 저장된 조사 결과를 표시합니다."
     : status === "unknown" ? "수집 상태를 확인할 수 없습니다."
     : age >= 2 ? `매물 조사가 ${age}일 전 자료입니다.` : "매물 조사 결과가 반영되었습니다.";
@@ -817,6 +821,12 @@ function renderCollectionStatus() {
 let firstPaint = true;
 function renderAll() {
   renderCollectionStatus(); renderHero(); renderSummary(); renderTransactions(); renderListings(); renderTrends(); renderChanges();
+  if (!state.isPrivate) {
+    const notice = emptyState('매물 분석은 개인 PC에서 제공됩니다', '공개 사이트에는 매물 원본과 관측 이력을 게시하지 않습니다.');
+    $('#listingMix').innerHTML = notice;
+    $('#recentSignals').innerHTML = notice;
+    $('#changeBadge').textContent = '비공개';
+  }
   if (firstPaint) {
     firstPaint = false;
     setTimeout(() => document.body.classList.add("no-anim"), 900);
