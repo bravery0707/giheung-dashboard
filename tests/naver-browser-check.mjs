@@ -12,9 +12,9 @@ const date = kstDate(new Date());
 const badge = `<span class="fixture__type-confirmed">확인매물 ${date.replaceAll('-', '.')}</span>`;
 const sub = (id, price) => `<li data-sentry-component="ArticleCardSub"><span class="fixture__price">매매 ${price}</span>${badge}<a href="/articles/${id}">매물 보러가기</a></li>`;
 const html = `<!doctype html><html lang="ko"><body><div id="complex_detail"><h3>힐스테이트기흥</h3>
-<button role="tab">매물</button><h3>매물2개도움말 보기</h3>
+<button role="tab" aria-selected="false" onclick="setTimeout(()=>{this.setAttribute('aria-selected','true');document.getElementById('filters').hidden=false},3000)">매물</button><h3>매물2개도움말 보기</h3>
 <button>매매1</button><button>전세0</button><button>월세1</button><button>단기0</button>
-<button>전체거래유형</button><button>전체면적</button><button>전체동</button><ul>
+<div id="filters" hidden><button>전체거래유형</button><button>전체면적</button><button>전체동</button></div><ul>
 <li data-sentry-component="ArticleCard"><div class="fixture__area-data"><span class="fixture__name">힐스테이트기흥 201동</span>
 <span class="fixture__price">매매 12억 ~ 12억 5,000</span><ul><li class="fixture__item-summary">아파트</li><li class="fixture__item-summary">104B㎡ (전용72.89B)</li><li class="fixture__item-summary">39/49층</li><li class="fixture__item-summary">남서향</li></ul>
 <span class="fixture__text-more">중개사 2곳에서 등록했어요</span><button class="fixture__button-expand" onclick="this.closest('[data-sentry-component=ArticleCard]').querySelector('.ads').innerHTML=document.getElementById('ads').innerHTML;this.textContent='매물목록 접기'">매물목록 펼치기</button></div><ul class="ads"></ul></li>
