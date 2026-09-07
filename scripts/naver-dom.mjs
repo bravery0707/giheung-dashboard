@@ -1,5 +1,17 @@
 import { COMPLEX, SCOPE, kstDate, calendarDate } from './listing-model.mjs';
 
+// A count may exist on the old price tab while the article tab is still mounting.
+export function naverListReady() {
+  const root = document.getElementById('complex_detail');
+  if (!root) return false;
+  const selected = root.querySelector('[role="tab"][aria-selected="true"]');
+  if (!selected || !/^매물(?:\s|현재|$)/.test(selected.textContent.trim())) return false;
+  const buttons = Array.from(root.querySelectorAll('button')).filter(b => b.getClientRects().length).map(b => b.textContent.trim());
+  return ['전체거래유형', '전체면적', '전체동'].every(t => buttons.includes(t))
+    && Array.from(root.querySelectorAll('h3')).some(h => /^매물\s*[1-9][\d,]*\s*개/.test(h.textContent))
+    && root.querySelectorAll('[data-sentry-component="ArticleCard"]').length > 0;
+}
+
 // Only rendered listing fields. No app state, response bodies, cookies or descriptions.
 export function readNaverDOM() {
   const root = document.getElementById('complex_detail');
