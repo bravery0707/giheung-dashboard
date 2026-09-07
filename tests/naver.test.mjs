@@ -42,7 +42,28 @@ test('request and action budgets stop before allowing excess work', () => {
   assert.equal(b.request('fetch'), true); assert.equal(b.request('fetch'), false); assert.throws(() => b.action(), { code: 'BUDGET' });
   const a = new BrowserBudget({ requests: 1, dataRequests: 1, actions: 1 });
   a.action(); assert.throws(() => a.action(), { code: 'BUDGET' });
+  a.stop('ACCESS_DENIED', 'denied after budget stop');
+  assert.throws(() => a.check(), { code: 'ACCESS_DENIED' });
 });
+test('static assets have a separate cap and never increase the data allowance', () => {
+  const b = new BrowserBudget({ requests: 600, staticRequests: 500, dataRequests: 100, actions: 45 });
+  for (let i = 0; i < 400; i++) assert.equal(b.request('script'), true);
+  for (let i = 0; i < 100; i++) assert.equal(b.request('fetch'), true);
+  assert.equal(b.request('fetch'), false); assert.equal(b.limitReached, 'data-requests');
+  const s = new BrowserBudget({ requests: 600, staticRequests: 500, dataRequests: 100 });
+  for (let i = 0; i < 500; i++) assert.equal(s.request('stylesheet'), true);
+  assert.equal(s.request('script'), false); assert.equal(s.limitReached, 'static-requests');
+});
+test('only an explicit manual budget retry runs once; scheduler/default calls stay blocked', () => temporary(async dir => {
+  const options = { config, directory: dir, now, capture: async () => { throw Object.assign(new Error('limit'), { code: 'BUDGET' }); } };
+  await assert.rejects(collectNaver(options), { code: 'BUDGET' });
+  await assert.rejects(collectNaver(options), { code: 'DAILY_LIMIT' });
+  await assert.rejects(collectNaver({ ...options, manualRetry: true }), { code: 'DAILY_LIMIT' });
+  const manual = { ...options, manualRetry: true, retryReason: 'Operator-approved local fixture check', capture: async () => ({ envelope: envelope(), audit: {} }) };
+  assert.equal((await collectNaver(manual)).listings.postings, 3);
+  await assert.rejects(collectNaver(manual), { code: 'DAILY_LIMIT' });
+  assert.equal((await readOptionalJson(join(dir, 'request-state.json'))).lastManualRetryDate, '2026-09-06');
+}));
 test('real capture adapter is inside persistent daily quota and shares the feed lock', () => temporary(async dir => {
   let calls = 0;
   const options = { config, directory: dir, now, capture: async () => { calls++; return { envelope: envelope(), audit: {} }; } };
@@ -54,6 +75,7 @@ test('access denial remains paused tomorrow; no retry, previous data remains int
   const capture = async () => { throw Object.assign(new Error('denied'), { code: 'ACCESS_DENIED' }); };
   await assert.rejects(collectNaver({ config, directory: dir, now, capture }), { code: 'ACCESS_DENIED' });
   await assert.rejects(collectNaver({ config, directory: dir, now: new Date(+now + 86400000), capture }), { code: 'PAUSED' });
+  await assert.rejects(collectNaver({ config, directory: dir, now, capture, manualRetry: true, retryReason: 'cannot override denial' }), { code: 'PAUSED' });
   assert.deepEqual((await readOptionalJson(join(dir, 'listings.json'))).listings, ['previous']);
 }));
 test('incomplete capture preserves good history and consumes the day', () => temporary(async dir => {
