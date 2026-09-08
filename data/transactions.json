@@ -1,5 +1,5 @@
 {
- "updated": "2026-09-07 01:12:02 UTC",
+ "updated": "2026-09-08 01:18:02 UTC",
  "source": "국토교통부 실거래가 (공공데이터포털 OpenAPI)",
  "apisUsed": [
   "아파트 매매 실거래가 상세 자료",
@@ -9,8 +9,22 @@
  "lawdCd": "41463",
  "apt": "힐스테이트기흥",
  "months": 36,
- "count": 516,
+ "count": 518,
  "transactions": [
+  {
+   "date": "2026-09-05",
+   "area": 84.51,
+   "py": 36,
+   "floor": 24,
+   "apt": "힐스테이트기흥",
+   "jibun": "660",
+   "umd": "구갈동",
+   "deal": "전세",
+   "amount": 60000,
+   "rent": 0,
+   "src": "국토부 전월세",
+   "contractType": "갱신"
+  },
   {
    "date": "2026-08-28",
    "area": 84.53,
@@ -38,6 +52,19 @@
    "rent": 0,
    "src": "국토부 전월세",
    "contractType": "신규"
+  },
+  {
+   "date": "2026-08-14",
+   "area": 72.73,
+   "py": 31,
+   "floor": 19,
+   "apt": "힐스테이트기흥",
+   "jibun": "660",
+   "umd": "구갈동",
+   "deal": "매매",
+   "amount": 115000,
+   "src": "국토부 매매 상세",
+   "canceled": false
   },
   {
    "date": "2026-08-13",
