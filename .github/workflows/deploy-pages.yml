@@ -1,0 +1,41 @@
+name: 대시보드 배포
+on:
+  push:
+    branches: [main]
+    paths: ["index.html", "assets/**", "data/**", "scripts/build-public.mjs", "scripts/private-storage.mjs", ".github/workflows/deploy-pages.yml"]
+  workflow_run:
+    workflows: ["실거래 데이터 갱신"]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+concurrency:
+  group: pages
+  cancel-in-progress: false
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      # Only trusted default-branch code; never consume PR artifacts.
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: 매물 처리 회귀 검사
+        run: node --test tests/*.test.mjs
+      - name: 공개할 파일만 모으기
+        run: node scripts/build-public.mjs
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: _site
+      - uses: actions/deploy-pages@v4
+        id: deployment

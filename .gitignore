@@ -1,0 +1,7 @@
+.private/
+node_modules/
+_site/
+*.tmp
+.env*
+incoming/*
+!incoming/README.md
